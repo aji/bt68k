@@ -216,6 +216,14 @@ fn test_matchers() {
     assert!( Matcher::EA(DATA).matches(0b000_010));
     assert!( Matcher::EA(DATA).matches(0b011_111));
     assert!(!Matcher::EA(DATA).matches(0b001_001));
+
+    assert!( Matcher::AE(ANY_EA).matches(0b000_000));
+    assert!( Matcher::AE(ANY_EA).matches(0b010_111));
+    assert!(!Matcher::AE(ANY_EA).matches(0b111_111));
+
+    assert!( Matcher::AE(DATA).matches(0b010_000));
+    assert!( Matcher::AE(DATA).matches(0b111_011));
+    assert!(!Matcher::AE(DATA).matches(0b001_001));
 }
 
 #[cfg(test)]
