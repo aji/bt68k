@@ -105,20 +105,35 @@ macro_rules! decoder {
     ($matchers:expr, $body:expr) => (
         SingleDecoder::new(
             $matchers.iter().cloned().collect(),
-            |pc| { $body }
+            $body
         )
     )
 }
 
+#[inline]
+fn triple(pc: &[u16], n: u16) -> u8 { ((pc[0] >> n) & 0b111) as u8 }
+
 fn all_decoders() -> Vec<SingleDecoder> { vec![
-    decoder!([ // ADD <ea>, Dn
-        Matcher::Nibble(0b1101),
+    decoder!([ // ABCD Dy, Dx
+        Matcher::Nibble(0b1100),
         Matcher::Any(3),
+        Matcher::Bit(1),
+        Matcher::Nibble(0b0000),
         Matcher::Bit(0),
-        Matcher::Size,
-        Matcher::EA(ANY_EA)
-    ], {
-        Ok((Instruction::ADD_to_Data(Size::Long, EA::DataDirect(4), 4), 1))
+        Matcher::Any(3)
+    ], |pc| {
+        Ok((ABCD_Data(triple(pc, 0), triple(pc, 9)), 1))
+    }),
+
+    decoder!([ // ABCD -(Ay), -(Ax)
+        Matcher::Nibble(0b1100),
+        Matcher::Any(3),
+        Matcher::Bit(1),
+        Matcher::Nibble(0b0000),
+        Matcher::Bit(1),
+        Matcher::Any(3)
+    ], |pc| {
+        Ok((ABCD_Addr(triple(pc, 0), triple(pc, 9)), 1))
     }),
 ] }
 
@@ -241,9 +256,12 @@ fn check_decode(d: &CarefulDecoder, pc: &[u16], i: Instruction) {
 fn test_decoders() {
     let d = CarefulDecoder::new();
 
-    // some simple decodes of common instructions
     check_decode(&d,
-        &[0b1101_100_010_000100],
-        ADD_to_Data(Size::Long, EA::DataDirect(4), 4)
+        &[0b1100_010_10000_0_011],
+        ABCD_Data(3, 2)
+    );
+    check_decode(&d,
+        &[0b1100_100_10000_1_101],
+        ABCD_Addr(5, 4)
     );
 }
