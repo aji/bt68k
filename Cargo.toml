@@ -1,0 +1,4 @@
+[package]
+name = "bt68k"
+version = "0.1.0"
+authors = ["Alex Iadicicco <alex@ajitek.net>"]
