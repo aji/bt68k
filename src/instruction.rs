@@ -8,9 +8,13 @@ pub type Ax = u8;
 pub type Ay = u8;
 pub type An = u8;
 
-pub type Xn = u8;
-
 pub type RegMask = u16;
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum Index {
+    Data(Size, Dn),
+    Addr(Size, An),
+}
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Size {
@@ -33,11 +37,11 @@ pub enum EA {
     AddrPostInc(An),
     AddrPreDec(An),
     AddrDisplace(An, i16),
-    AddrIndex(An, Xn, i16),
-    AbsShort(u16),
+    AddrIndex(An, Index, i8),
+    AbsWord(i16),
     AbsLong(u32),
     PcDisplace(i16),
-    PcIndex(i16),
+    PcIndex(Index, i8),
     ImmByte(u8),
     ImmWord(u16),
     ImmLong(u32),
