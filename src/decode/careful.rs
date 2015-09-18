@@ -46,6 +46,28 @@ const PC_DISPLACE: u16     = 0b001000000000;
 const PC_INDEX: u16        = 0b010000000000;
 const IMMEDIATE: u16       = 0b100000000000;
 
+// Cond type bit masks, same situation as with EAs
+const ANY_COND: u16             = 0b_1111_1111_1111_1111;
+const TRUE_COND: u16            = 0b_1111_1111_1111_1100;
+
+// Cond type bit flags
+const CC_TRUE: u16              = 0b_0000_0000_0000_0001;
+const CC_FALSE: u16             = 0b_0000_0000_0000_0010;
+const CC_HIGH: u16              = 0b_0000_0000_0000_0100;
+const CC_LOW_OR_SAME: u16       = 0b_0000_0000_0000_1000;
+const CC_HIGH_OR_SAME: u16      = 0b_0000_0000_0001_0000;
+const CC_LOW: u16               = 0b_0000_0000_0010_0000;
+const CC_NOT_EQUAL: u16         = 0b_0000_0000_0100_0000;
+const CC_EQUAL: u16             = 0b_0000_0000_1000_0000;
+const CC_OVERFLOW_CLEAR: u16    = 0b_0000_0001_0000_0000;
+const CC_OVERFLOW_SET: u16      = 0b_0000_0010_0000_0000;
+const CC_PLUS: u16              = 0b_0000_0100_0000_0000;
+const CC_MINUS: u16             = 0b_0000_1000_0000_0000;
+const CC_GREATER_OR_EQUAL: u16  = 0b_0001_0000_0000_0000;
+const CC_LESS_THAN: u16         = 0b_0010_0000_0000_0000;
+const CC_GREATER_THAN: u16      = 0b_0100_0000_0000_0000;
+const CC_LESS_OR_EQUAL: u16     = 0b_1000_0000_0000_0000;
+
 /// An effective address specifier. Explains the kind of EA, using the bit
 /// flags above, and includes the register field if relevant.
 struct EASpec(u16, u8);
@@ -79,6 +101,30 @@ fn describe_ea(mode: u16, reg: u16) -> Result<EASpec, MatchError> {
     }
 }
 
+/// Given an encoded condition code, produces the bit that corresponds to it
+/// in the condition code masks
+fn describe_cc(cc: u16) -> Option<u16> {
+    match cc {
+        0b0000 => Some(CC_TRUE),
+        0b0001 => Some(CC_FALSE),
+        0b0010 => Some(CC_HIGH),
+        0b0011 => Some(CC_LOW_OR_SAME),
+        0b0100 => Some(CC_HIGH_OR_SAME),
+        0b0101 => Some(CC_LOW),
+        0b0110 => Some(CC_NOT_EQUAL),
+        0b0111 => Some(CC_EQUAL),
+        0b1000 => Some(CC_OVERFLOW_CLEAR),
+        0b1001 => Some(CC_OVERFLOW_SET),
+        0b1010 => Some(CC_PLUS),
+        0b1011 => Some(CC_MINUS),
+        0b1100 => Some(CC_GREATER_OR_EQUAL),
+        0b1101 => Some(CC_LESS_THAN),
+        0b1110 => Some(CC_GREATER_THAN),
+        0b1111 => Some(CC_LESS_OR_EQUAL),
+        _ => None
+    }
+}
+
 /// A matcher. Each matcher matches a fixed number of bits in an encoded
 /// instruction word. A sequence of matchers totaling 16 encoded bits
 /// corresponds to an entire instruction matcher.
@@ -102,6 +148,9 @@ enum Matcher {
     /// Same as EA, but the mode and register subfields are swapped. (Used for
     /// matching MOVE)
     AE(u16),
+    /// Matches a 4 bit condition code field. Valid settings are determined by
+    /// the given CC mask (see above)
+    Cond(u16),
 }
 
 impl Matcher {
@@ -115,6 +164,7 @@ impl Matcher {
         Matcher::Size        =>  2,
         Matcher::EA(_)       =>  6,
         Matcher::AE(_)       =>  6,
+        Matcher::Cond(_)     =>  4,
         }
     }
 
@@ -140,6 +190,10 @@ impl Matcher {
         Matcher::AE(mask) => match describe_ea(x & 7, x >> 3) {
             Ok(ea) => (mask & ea.0) != 0,
             Err(_) => false,
+            },
+        Matcher::Cond(mask) => match describe_cc(x & 15) {
+            Some(cc) => (mask & cc) != 0,
+            None => false,
             },
         }
     }
@@ -234,6 +288,30 @@ fn decode_size(pc: &[u16], n: u16) -> Option<Size> {
         0b00 => Some(Size::Byte),
         0b01 => Some(Size::Word),
         0b10 => Some(Size::Long),
+        _ => None
+    }
+}
+
+#[inline]
+fn decode_cond(pc: &[u16], n: u16) -> Option<Cond> {
+    let cc = (pc[0] >> n) & 0xf;
+    match cc {
+        0b0000 => Some(Cond::True),
+        0b0001 => Some(Cond::False),
+        0b0010 => Some(Cond::High),
+        0b0011 => Some(Cond::LowOrSame),
+        0b0100 => Some(Cond::HighOrSame),
+        0b0101 => Some(Cond::Low),
+        0b0110 => Some(Cond::NotEqual),
+        0b0111 => Some(Cond::Equal),
+        0b1000 => Some(Cond::OverflowClear),
+        0b1001 => Some(Cond::OverflowSet),
+        0b1010 => Some(Cond::Plus),
+        0b1011 => Some(Cond::Minus),
+        0b1100 => Some(Cond::GreaterOrEqual),
+        0b1101 => Some(Cond::LessThan),
+        0b1110 => Some(Cond::GreaterThan),
+        0b1111 => Some(Cond::LessOrEqual),
         _ => None
     }
 }
@@ -384,6 +462,317 @@ fn all_decoders() -> Vec<SingleDecoder> { vec![
         let ea = decode_ea(pc, 0, size, &mut len).unwrap();
         Ok((AND_to_EA(size, triple(pc, 9), ea), len))
     }),
+
+    decoder!([ // ANDI #<data>, <ea>
+        Matcher::Nibble(0b0000),
+        Matcher::Nibble(0b0010),
+        Matcher::Size,
+        Matcher::EA(DATA & ALTERABLE)
+    ], |pc| {
+        let mut len = 1;
+        let size = decode_size(pc, 6).unwrap();
+        let imm = match size {
+            Size::Byte | Size::Word => { len += 1; pc[1] as u32 },
+            Size::Long => imm_long(pc, &mut len)
+        };
+        let ea = decode_ea(pc, 0, size, &mut len).unwrap();
+        Ok((ANDI(size, imm, ea), len))
+    }),
+
+    decoder!([ // ANDI #xxx, CCR
+        Matcher::Word(0b00000010_00111100)
+    ], |pc| {
+        Ok((ANDI_to_CCR(pc[1] as u8), 2))
+    }),
+
+    decoder!([ // ANDI #xxx, SR
+        Matcher::Word(0b00000010_01111100)
+    ], |pc| {
+        Ok((ANDI_to_SR(pc[1]), 2))
+    }),
+
+    decoder!([ // ASd Dx, Dy
+        Matcher::Nibble(0b1110),
+        Matcher::Any(3), // Dx
+        Matcher::Any(1), // direction
+        Matcher::Size,
+        Matcher::Bit(1),
+        Matcher::Bit(0), Matcher::Bit(0),
+        Matcher::Any(3), // Dy
+    ], |pc| {
+        let size = decode_size(pc, 6).unwrap();
+        let dir = if bit(pc, 8) == 0 { Dir::Right } else { Dir::Left };
+        Ok((ASd_Data(size, dir, triple(pc, 9), triple(pc, 0)), 1))
+    }),
+
+    decoder!([ // ASd #<data>, Dy
+        Matcher::Nibble(0b1110),
+        Matcher::Any(3), // Dx
+        Matcher::Any(1), // direction
+        Matcher::Size,
+        Matcher::Bit(0),
+        Matcher::Bit(0), Matcher::Bit(0),
+        Matcher::Any(3), // Dy
+    ], |pc| {
+        let size = decode_size(pc, 6).unwrap();
+        let dir = if bit(pc, 8) == 0 { Dir::Right } else { Dir::Left };
+        Ok((ASd_to_Data(size, dir, triple(pc, 9), triple(pc, 0)), 1))
+    }),
+
+    decoder!([ // ASd <ea>
+        Matcher::Nibble(0b1110),
+        Matcher::Bit(0), Matcher::Bit(0), Matcher::Bit(0),
+        Matcher::Any(1), // direction
+        Matcher::Bit(1), Matcher::Bit(1),
+        Matcher::EA(MEMORY & ALTERABLE)
+    ], |pc| {
+        let mut len = 1;
+        let dir = if bit(pc, 8) == 0 { Dir::Right } else { Dir::Left };
+        let ea = decode_ea(pc, 0, Size::Word, &mut len).unwrap();
+        Ok((ASd_EA(dir, ea), len))
+    }),
+
+    decoder!([ // Bcc <label>
+        Matcher::Nibble(0b0110),
+        Matcher::Cond(TRUE_COND), // condition
+        Matcher::Any(8), // displacement
+    ], |pc| {
+        let cond = decode_cond(pc, 8).unwrap();
+        let disp = (pc[0] & 0xff) as i8;
+        Ok(if disp == 0 {
+            (Bcc(cond, pc[1] as i16), 2)
+        } else {
+            (Bcc(cond, disp as i16), 1)
+        })
+    }),
+
+    decoder!([ // BCHG Dn, <ea>
+        Matcher::Nibble(0b0000),
+        Matcher::Any(3),
+        Matcher::Bit(1), Matcher::Bit(0), Matcher::Bit(1),
+        Matcher::EA(DATA & ALTERABLE)
+    ], |pc| {
+        let mut len = 1;
+        let ea = decode_ea(pc, 0, Size::Byte, &mut len).unwrap();
+        Ok((BCHG_Data(triple(pc, 9), ea), len))
+    }),
+
+    decoder!([ // BCHG #<data>, <ea>
+        Matcher::Nibble(0b0000),
+        Matcher::Nibble(0b1000),
+        Matcher::Bit(0), Matcher::Bit(1),
+        Matcher::EA(DATA & ALTERABLE)
+    ], |pc| {
+        let mut len = 2;
+        let imm = pc[1] as u8;
+        let ea = decode_ea(pc, 0, Size::Byte, &mut len).unwrap();
+        Ok((BCHG_Imm(imm, ea), len))
+    }),
+
+    decoder!([ // BCLR Dn, <ea>
+        Matcher::Nibble(0b0000),
+        Matcher::Any(3),
+        Matcher::Bit(1), Matcher::Bit(1), Matcher::Bit(0),
+        Matcher::EA(DATA & ALTERABLE)
+    ], |pc| {
+        let mut len = 1;
+        let ea = decode_ea(pc, 0, Size::Byte, &mut len).unwrap();
+        Ok((BCLR_Data(triple(pc, 9), ea), len))
+    }),
+
+    decoder!([ // BCLR #<data>, <ea>
+        Matcher::Nibble(0b0000),
+        Matcher::Nibble(0b1000),
+        Matcher::Bit(1), Matcher::Bit(0),
+        Matcher::EA(DATA & ALTERABLE)
+    ], |pc| {
+        let mut len = 2;
+        let imm = pc[1] as u8;
+        let ea = decode_ea(pc, 0, Size::Byte, &mut len).unwrap();
+        Ok((BCLR_Imm(imm, ea), len))
+    }),
+
+    decoder!([ // BRA <label>
+        Matcher::Nibble(0b0110),
+        Matcher::Nibble(0b0000),
+        Matcher::Any(8), // displacement
+    ], |pc| {
+        let disp = (pc[0] & 0xff) as i8;
+        Ok(if disp == 0 {
+            (BRA(pc[1] as i16), 2)
+        } else {
+            (BRA(disp as i16), 1)
+        })
+    }),
+
+    decoder!([ // BSET Dn, <ea>
+        Matcher::Nibble(0b0000),
+        Matcher::Any(3),
+        Matcher::Bit(1), Matcher::Bit(1), Matcher::Bit(1),
+        Matcher::EA(DATA & ALTERABLE)
+    ], |pc| {
+        let mut len = 1;
+        let ea = decode_ea(pc, 0, Size::Byte, &mut len).unwrap();
+        Ok((BSET_Data(triple(pc, 9), ea), len))
+    }),
+
+    decoder!([ // BSET #<data>, <ea>
+        Matcher::Nibble(0b0000),
+        Matcher::Nibble(0b1000),
+        Matcher::Bit(1), Matcher::Bit(1),
+        Matcher::EA(DATA & ALTERABLE)
+    ], |pc| {
+        let mut len = 2;
+        let imm = pc[1] as u8;
+        let ea = decode_ea(pc, 0, Size::Byte, &mut len).unwrap();
+        Ok((BSET_Imm(imm, ea), len))
+    }),
+
+    decoder!([ // BSR <label>
+        Matcher::Nibble(0b0110),
+        Matcher::Nibble(0b0001),
+        Matcher::Any(8), // displacement
+    ], |pc| {
+        let disp = (pc[0] & 0xff) as i8;
+        Ok(if disp == 0 {
+            (BSR(pc[1] as i16), 2)
+        } else {
+            (BSR(disp as i16), 1)
+        })
+    }),
+
+    decoder!([ // BTST Dn, <ea>
+        Matcher::Nibble(0b0000),
+        Matcher::Any(3),
+        Matcher::Bit(1), Matcher::Bit(0), Matcher::Bit(0),
+        Matcher::EA(DATA & ALTERABLE)
+    ], |pc| {
+        let mut len = 1;
+        let ea = decode_ea(pc, 0, Size::Byte, &mut len).unwrap();
+        Ok((BTST_Data(triple(pc, 9), ea), len))
+    }),
+
+    decoder!([ // BTST #<data>, <ea>
+        Matcher::Nibble(0b0000),
+        Matcher::Nibble(0b1000),
+        Matcher::Bit(0), Matcher::Bit(0),
+        Matcher::EA(DATA & ALTERABLE)
+    ], |pc| {
+        let mut len = 2;
+        let imm = pc[1] as u8;
+        let ea = decode_ea(pc, 0, Size::Byte, &mut len).unwrap();
+        Ok((BTST_Imm(imm, ea), len))
+    }),
+
+    decoder!([ // CHK <ea>, Dn
+        Matcher::Nibble(0b0100),
+        Matcher::Any(3),
+        Matcher::Bit(1), Matcher::Bit(1), Matcher::Bit(0),
+        Matcher::EA(DATA)
+    ], |pc| {
+        let mut len = 1;
+        let ea = decode_ea(pc, 0, Size::Byte, &mut len).unwrap();
+        Ok((CHK(ea, triple(pc, 9)), len))
+    }),
+
+    decoder!([ // CLR <ea>
+        Matcher::Nibble(0b0100),
+        Matcher::Nibble(0b0010),
+        Matcher::Size,
+        Matcher::EA(DATA & ALTERABLE)
+    ], |pc| {
+        let mut len = 1;
+        let size = decode_size(pc, 6).unwrap();
+        let ea = decode_ea(pc, 0, size, &mut len).unwrap();
+        Ok((CLR(size, ea), len))
+    }),
+
+    decoder!([ // CMP <ea>, Dn
+        Matcher::Nibble(0b1011),
+        Matcher::Any(3), // Dn
+        Matcher::Bit(0),
+        Matcher::Size,
+        Matcher::EA(ANY_EA)
+    ], |pc| {
+        let mut len = 1;
+        let size = decode_size(pc, 6).unwrap();
+        let ea = decode_ea(pc, 0, size, &mut len).unwrap();
+        Ok((CMP(size, ea, triple(pc, 9)), len))
+    }),
+
+    decoder!([ // CMPA <ea>, An
+        Matcher::Nibble(0b1011),
+        Matcher::Any(3), // Dn
+        Matcher::Any(1), // size
+        Matcher::Bit(0), Matcher::Bit(1),
+        Matcher::EA(ANY_EA)
+    ], |pc| {
+        let mut len = 1;
+        let size = decode_size(pc, 6).unwrap();
+        let ea = decode_ea(pc, 0, size, &mut len).unwrap();
+        Ok((CMPA(size, ea, triple(pc, 9)), len))
+    }),
+
+    decoder!([ // CMPI #<data>, <ea>
+        Matcher::Nibble(0b0000),
+        Matcher::Nibble(0b1100),
+        Matcher::Size,
+        Matcher::EA(DATA & ALTERABLE)
+    ], |pc| {
+        let mut len = 1;
+        let size = decode_size(pc, 6).unwrap();
+        let imm = match size {
+            Size::Byte | Size::Word => { len += 1; pc[1] as u32 },
+            Size::Long => imm_long(pc, &mut len)
+        };
+        let ea = decode_ea(pc, 0, size, &mut len).unwrap();
+        Ok((CMPI(size, imm, ea), len))
+    }),
+
+    decoder!([ // CMPM (Ay)+, (Ax)+
+        Matcher::Nibble(0b1011),
+        Matcher::Any(3), // Ax
+        Matcher::Bit(1),
+        Matcher::Size,
+        Matcher::Bit(0), Matcher::Bit(0), Matcher::Bit(1),
+        Matcher::Any(3), // Ay
+    ], |pc| {
+        let size = decode_size(pc, 6).unwrap();
+        Ok((CMPM(size, triple(pc, 0), triple(pc, 9)), 1))
+    }),
+
+    decoder!([ // DBcc Dn, <label>
+        Matcher::Nibble(0b0101),
+        Matcher::Cond(ANY_COND),
+        Matcher::Nibble(0b1100),
+        Matcher::Bit(1),
+        Matcher::Any(3), // Dn
+    ], |pc| {
+        let cond = decode_cond(pc, 8).unwrap();
+        Ok((DBcc(cond, triple(pc, 0), pc[1] as i16), 2))
+    }),
+
+    decoder!([ // DIVS <ea>, Dn
+        Matcher::Nibble(0b1000),
+        Matcher::Any(3),
+        Matcher::Bit(1), Matcher::Bit(1), Matcher::Bit(1),
+        Matcher::EA(DATA)
+    ], |pc| {
+        let mut len = 1;
+        let ea = decode_ea(pc, 0, Size::Byte, &mut len).unwrap();
+        Ok((DIVS(ea, triple(pc, 9)), len))
+    }),
+
+    decoder!([ // DIVU <ea>, Dn
+        Matcher::Nibble(0b1000),
+        Matcher::Any(3),
+        Matcher::Bit(0), Matcher::Bit(1), Matcher::Bit(1),
+        Matcher::EA(DATA)
+    ], |pc| {
+        let mut len = 1;
+        let ea = decode_ea(pc, 0, Size::Byte, &mut len).unwrap();
+        Ok((DIVU(ea, triple(pc, 9)), len))
+    }),
 ] }
 
 /// A decoder for a single instruction. Pairs a list of matchers with a decoder
@@ -497,6 +886,10 @@ fn test_matchers() {
     assert!( Matcher::AE(DATA).matches(0b010_000));
     assert!( Matcher::AE(DATA).matches(0b111_011));
     assert!(!Matcher::AE(DATA).matches(0b001_001));
+
+    assert!( Matcher::Cond(TRUE_COND).matches(0b0100));
+    assert!( Matcher::Cond(TRUE_COND).matches(0b0101));
+    assert!(!Matcher::Cond(TRUE_COND).matches(0b0001));
 }
 
 #[cfg(test)]
@@ -637,13 +1030,48 @@ fn test_decoders() {
         &[0b1101_001_1_10_100100],
         ADD_to_EA(Size::Long, 1, EA::AddrPreDec(4))
     );
-    // ADDA
-    // ADDI
-    // ADDQ
+    check_decode(&d,
+        &[0b1101_111_1_11_000111],
+        ADDA(Size::Long, EA::DataDirect(7), 7)
+    );
+    check_decode(&d, &[
+            0b0000_0110_01_010011,
+            0b00000000_00001111,
+        ],
+        ADDI(Size::Word, 15, EA::AddrIndirect(3))
+    );
+    check_decode(&d,
+        &[0b0101_101_0_10_100010],
+        ADDQ(Size::Long, 5, EA::AddrPreDec(2))
+    );
     // ADDX_Data
     // ADDX_Addr
     // AND_to_Data
     // AND_to_EA
+    // ANDI
+    // ASd_Data
+    // ASd_to_Data
+    // ASd_EA
+    // Bcc
+    // BCHG_Data
+    // BCHG_Imm
+    // BCLR_Data
+    // BCLR_Imm
+    // BRA
+    // BSET_Data
+    // BSET_Imm
+    // BSR
+    // BTST_Data
+    // BTST_Imm
+    // CHK
+    // CLR
+    // CMP
+    // CMPA
+    // CMPI
+    // CMPM
+    // DBcc
+    // DIVS
+    // DIVU
 }
 
 #[test]
@@ -658,4 +1086,15 @@ fn test_gotchas() {
         &[0b1101_100_0_10_000011],
         ADD_to_Data(Size::Long, EA::DataDirect(3), 4)
     );
+}
+
+#[test]
+fn test_all_patterns() {
+    let d = CarefulDecoder::new();
+
+    for i in 0..0x10000 {
+        let pc = [i as u16, 0, 0, 0, 0, 0, 0];
+        println!("0b{:016b}", i);
+        let _ = d.decode(&pc);
+    }
 }
