@@ -773,6 +773,204 @@ fn all_decoders() -> Vec<SingleDecoder> { vec![
         let ea = decode_ea(pc, 0, Size::Byte, &mut len).unwrap();
         Ok((DIVU(ea, triple(pc, 9)), len))
     }),
+
+    decoder!([ // EOR Dn, <ea>
+        Matcher::Nibble(0b1011),
+        Matcher::Any(3),
+        Matcher::Bit(1),
+        Matcher::Size,
+        Matcher::EA(DATA & ALTERABLE)
+    ], |pc| {
+        let mut len = 1;
+        let size = decode_size(pc, 6).unwrap();
+        let ea = decode_ea(pc, 0, size, &mut len).unwrap();
+        Ok((EOR(size, triple(pc, 9), ea), len))
+    }),
+
+    decoder!([ // EORI #<data>, <ea>
+        Matcher::Nibble(0b0000),
+        Matcher::Nibble(0b1010),
+        Matcher::Size,
+        Matcher::EA(DATA & ALTERABLE)
+    ], |pc| {
+        let mut len = 1;
+        let size = decode_size(pc, 6).unwrap();
+        let imm = match size {
+            Size::Byte | Size::Word => { len += 1; pc[1] as u32 },
+            Size::Long => imm_long(pc, &mut len)
+        };
+        let ea = decode_ea(pc, 0, size, &mut len).unwrap();
+        Ok((EORI(size, imm, ea), len))
+    }),
+
+    decoder!([ // EORI #xxx, CCR
+        Matcher::Word(0b0000101000111100),
+    ], |pc| {
+        Ok((EORI_to_CCR(pc[1] as u8), 2))
+    }),
+
+    decoder!([ // EORI #xxx, SR
+        Matcher::Word(0b0000101001111100),
+    ], |pc| {
+        Ok((EORI_to_SR(pc[1]), 2))
+    }),
+
+    decoder!([ // EXG Dx, Dy
+        Matcher::Nibble(0b1100),
+        Matcher::Any(3),
+        Matcher::Bit(1),
+        Matcher::Nibble(0b0100),
+        Matcher::Bit(0),
+        Matcher::Any(3),
+    ], |pc| {
+        Ok((EXG_Data(triple(pc, 9), triple(pc, 0)), 1))
+    }),
+
+    decoder!([ // EXG Ax, Ay
+        Matcher::Nibble(0b1100),
+        Matcher::Any(3),
+        Matcher::Bit(1),
+        Matcher::Nibble(0b0100),
+        Matcher::Bit(1),
+        Matcher::Any(3),
+    ], |pc| {
+        Ok((EXG_Addr(triple(pc, 9), triple(pc, 0)), 1))
+    }),
+
+    decoder!([ // EXG Dx, Ay
+        Matcher::Nibble(0b1100),
+        Matcher::Any(3),
+        Matcher::Bit(1),
+        Matcher::Nibble(0b1000),
+        Matcher::Bit(1),
+        Matcher::Any(3),
+    ], |pc| {
+        Ok((EXG_Both(triple(pc, 9), triple(pc, 0)), 1))
+    }),
+
+    decoder!([ // EXT.w Dn
+        Matcher::Nibble(0b0100),
+        Matcher::Nibble(0b1000),
+        Matcher::Nibble(0b1000),
+        Matcher::Bit(0),
+        Matcher::Any(3),
+    ], |pc| {
+        Ok((EXT(Size::Word, triple(pc, 0)), 1))
+    }),
+
+    decoder!([ // EXT.l Dn
+        Matcher::Nibble(0b0100),
+        Matcher::Nibble(0b1000),
+        Matcher::Nibble(0b1100),
+        Matcher::Bit(0),
+        Matcher::Any(3),
+    ], |pc| {
+        Ok((EXT(Size::Long, triple(pc, 0)), 1))
+    }),
+
+    decoder!([ // ILLEGAL
+        Matcher::Word(0b0100101011111100),
+    ], |_| {
+        Ok((ILLEGAL, 1))
+    }),
+
+    decoder!([ // JMP <ea>
+        Matcher::Nibble(0b0100),
+        Matcher::Nibble(0b1110),
+        Matcher::Bit(1), Matcher::Bit(1),
+        Matcher::EA(CONTROL)
+    ], |pc| {
+        let mut len = 1;
+        let ea = decode_ea(pc, 0, Size::Word, &mut len).unwrap();
+        Ok((JMP(ea), len))
+    }),
+
+    decoder!([ // JSR <ea>
+        Matcher::Nibble(0b0100),
+        Matcher::Nibble(0b1110),
+        Matcher::Bit(1), Matcher::Bit(0),
+        Matcher::EA(CONTROL)
+    ], |pc| {
+        let mut len = 1;
+        let ea = decode_ea(pc, 0, Size::Word, &mut len).unwrap();
+        Ok((JSR(ea), len))
+    }),
+
+    decoder!([ // LEA <ea>, An
+        Matcher::Nibble(0b0100),
+        Matcher::Any(3),
+        Matcher::Bit(1), Matcher::Bit(1), Matcher::Bit(1),
+        Matcher::EA(CONTROL)
+    ], |pc| {
+        let mut len = 1;
+        let ea = decode_ea(pc, 0, Size::Word, &mut len).unwrap();
+        Ok((LEA(ea, triple(pc, 9)), len))
+    }),
+
+    decoder!([ // LINK An, #<displacement>
+        Matcher::Nibble(0b0100),
+        Matcher::Nibble(0b1110),
+        Matcher::Nibble(0b0101),
+        Matcher::Bit(0),
+        Matcher::Any(3),
+    ], |pc| {
+        Ok((LINK(triple(pc, 0), pc[1] as i16), 2))
+    }),
+
+    decoder!([ // LSd Dx, Dy
+        Matcher::Nibble(0b1110),
+        Matcher::Any(3), // Dx
+        Matcher::Any(1), // direction
+        Matcher::Size,
+        Matcher::Bit(1),
+        Matcher::Bit(0), Matcher::Bit(1),
+        Matcher::Any(3), // Dy
+    ], |pc| {
+        let size = decode_size(pc, 6).unwrap();
+        let dir = if bit(pc, 8) == 0 { Dir::Right } else { Dir::Left };
+        Ok((LSd_Data(size, dir, triple(pc, 9), triple(pc, 0)), 1))
+    }),
+
+    decoder!([ // LSd #<data>, Dy
+        Matcher::Nibble(0b1110),
+        Matcher::Any(3), // Dx
+        Matcher::Any(1), // direction
+        Matcher::Size,
+        Matcher::Bit(0),
+        Matcher::Bit(0), Matcher::Bit(1),
+        Matcher::Any(3), // Dy
+    ], |pc| {
+        let size = decode_size(pc, 6).unwrap();
+        let dir = if bit(pc, 8) == 0 { Dir::Right } else { Dir::Left };
+        Ok((LSd_to_Data(size, dir, triple(pc, 9), triple(pc, 0)), 1))
+    }),
+
+    decoder!([ // LSd <ea>
+        Matcher::Nibble(0b1110),
+        Matcher::Bit(0), Matcher::Bit(0), Matcher::Bit(1),
+        Matcher::Any(1), // direction
+        Matcher::Bit(1), Matcher::Bit(1),
+        Matcher::EA(MEMORY & ALTERABLE)
+    ], |pc| {
+        let mut len = 1;
+        let dir = if bit(pc, 8) == 0 { Dir::Right } else { Dir::Left };
+        let ea = decode_ea(pc, 0, Size::Word, &mut len).unwrap();
+        Ok((ASd_EA(dir, ea), len))
+    }),
+
+    decoder!([ // MOVE <ea>, <ea>
+        Matcher::Bit(0), Matcher::Bit(0),
+        Matcher::Size,
+        Matcher::AE(DATA & ALTERABLE),
+        Matcher::EA(ANY_EA)
+    ], |pc| {
+        let mut len = 1;
+        let size = decode_size(pc, 12).unwrap();
+        // source comes first!
+        let src = decode_ea(pc, 0, size, &mut len).unwrap();
+        let dst = decode_ae(pc, 6, size, &mut len).unwrap();
+        Ok((MOVE(size, src, dst), len))
+    }),
 ] }
 
 /// A decoder for a single instruction. Pairs a list of matchers with a decoder
@@ -1072,6 +1270,26 @@ fn test_decoders() {
     // DBcc
     // DIVS
     // DIVU
+    // EOR
+    // EORI
+    // EORI_to_CCR
+    // EORI_to_SR
+    // EXG_Data
+    // EXG_Addr
+    // EXG_Both
+    // EXT
+    // ILLEGAL
+    // JMP
+    // JSR
+    // LEA
+    // LINK
+    // LSd_Data
+    // LSd_to_Data
+    // LSd_EA
+    check_decode(&d,
+        &[0x296c, 0x0003, 0x0005], // GNU m68k-as output
+        MOVE(Size::Long, EA::AddrDisplace(4, 3), EA::AddrDisplace(4, 5))
+    );
 }
 
 #[test]
