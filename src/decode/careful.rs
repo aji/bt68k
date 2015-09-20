@@ -1049,9 +1049,55 @@ fn all_decoders() -> Vec<SingleDecoder> { vec![
         Ok((MOVEA(size, ea, triple(pc, 9)), len))
     }),
 
-    // TODO: MOVEM
+    decoder!([ // MOVEM <register list>, <ea>
+        Matcher::Nibble(0b0100),
+        Matcher::Nibble(0b1000),
+        Matcher::Bit(1),
+        Matcher::Any(1),
+        Matcher::EA((CONTROL & ALTERABLE) | ADDR_PREDEC),
+    ], |pc| {
+        let mut len = 2;
+        let size = if bit(pc, 6) == 0 { Size::Word } else { Size::Long };
+        let ea = decode_ea(pc, 0, size, &mut len).unwrap();
+        Ok((MOVEM_Save(size, pc[1], ea), len))
+    }),
 
-    // TODO: MOVEP
+    decoder!([ // MOVEM <register list>, <ea>
+        Matcher::Nibble(0b0100),
+        Matcher::Nibble(0b1100),
+        Matcher::Bit(1),
+        Matcher::Any(1),
+        Matcher::EA(CONTROL | ADDR_POSTINC),
+    ], |pc| {
+        let mut len = 2;
+        let size = if bit(pc, 6) == 0 { Size::Word } else { Size::Long };
+        let ea = decode_ea(pc, 0, size, &mut len).unwrap();
+        Ok((MOVEM_Load(size, ea, pc[1]), len))
+    }),
+
+    decoder!([ // MOVEP Dx, d(Ay)
+        Matcher::Nibble(0b0000),
+        Matcher::Any(3),
+        Matcher::Bit(1), Matcher::Bit(1),
+        Matcher::Any(1),
+        Matcher::Bit(0), Matcher::Bit(0), Matcher::Bit(1),
+        Matcher::Any(3),
+    ], |pc| {
+        let size = if bit(pc, 6) == 0 { Size::Word } else { Size::Long };
+        Ok((MOVEP_Save(size, triple(pc, 9), pc[1] as i16, triple(pc, 0)), 2))
+    }),
+
+    decoder!([ // MOVEP d(Ay), Dx
+        Matcher::Nibble(0b0000),
+        Matcher::Any(3),
+        Matcher::Bit(1), Matcher::Bit(0),
+        Matcher::Any(1),
+        Matcher::Bit(0), Matcher::Bit(0), Matcher::Bit(1),
+        Matcher::Any(3),
+    ], |pc| {
+        let size = if bit(pc, 6) == 0 { Size::Word } else { Size::Long };
+        Ok((MOVEP_Load(size, triple(pc, 9), pc[1] as i16, triple(pc, 0)), 2))
+    }),
 
     decoder!([ // MOVEQ #<data>, Dn
         Matcher::Nibble(0b0111),
