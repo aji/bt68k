@@ -1892,11 +1892,18 @@ fn test_gotchas() {
 
 #[test]
 fn test_all_patterns() {
-    let d = CarefulDecoder::new();
+    let ds = all_decoders();
 
     for i in 0..0x10000 {
         let pc = [i as u16, 0, 0, 0, 0, 0, 0];
+        let mut matches = 0;
         println!("0b{:016b}", i);
-        let _ = d.decode(&pc);
+        for d in ds.iter() {
+            if let Ok(inst) = d.decode(&pc) {
+                println!("  -> {:?}", inst);
+                matches += 1;
+            }
+        }
+        assert!(matches < 2);
     }
 }
