@@ -225,9 +225,15 @@ fn pair(pc: &[u16], n: u16) -> u8 { ((pc[0] >> n) & 0b11) as u8 }
 fn triple(pc: &[u16], n: u16) -> u8 { ((pc[0] >> n) & 0b111) as u8 }
 
 #[inline]
-fn imm_long(pc: &[u16], at: &mut usize) -> u32 {
-    *at += 2;
-    ((pc[*at - 2] as u32) << 16) | (pc[*at - 1] as u32)
+fn immediate(pc: &[u16], sz: Size, at: &mut usize) -> u32 {
+    match sz {
+        Size::Byte => { *at += 1; (pc[*at - 1] & 0xff) as u32 },
+        Size::Word => { *at += 1; pc[*at - 1] as u32 },
+        Size::Long => {
+            *at += 2;
+            ((pc[*at - 2] as u32) << 16) | (pc[*at - 1] as u32)
+        }
+    }
 }
 
 #[inline]
@@ -258,13 +264,13 @@ fn decode_ea_real(pc: &[u16], mode: u8, reg: u8, sz: Size, at: &mut usize)
         0b110 => { *at += 1; Some(decode_indexed(ext, Some(reg))) },
         0b111 => match reg {
             0b000 => { *at += 1; Some(EA::AbsWord(ext[0] as i16)) },
-            0b001 => { Some(EA::AbsLong(imm_long(pc, at))) },
+            0b001 => { Some(EA::AbsLong(immediate(pc, Size::Long, at))) },
             0b010 => { *at += 1; Some(EA::PcDisplace(ext[0] as i16)) },
             0b011 => { *at += 1; Some(decode_indexed(ext, None)) },
             0b100 => match sz {
                 Size::Byte => { *at += 1; Some(EA::ImmByte(ext[0] as u8)) },
                 Size::Word => { *at += 1; Some(EA::ImmWord(ext[0])) },
-                Size::Long => { Some(EA::ImmLong(imm_long(pc, at))) },
+                Size::Long => { Some(EA::ImmLong(immediate(pc, Size::Long, at))) },
             },
             _ => None,
         },
@@ -387,10 +393,7 @@ fn all_decoders() -> Vec<SingleDecoder> { vec![
     ], |pc| {
         let mut len = 1;
         let size = decode_size(pc, 6).unwrap();
-        let imm = match size {
-            Size::Byte | Size::Word => { len += 1; pc[1] as u32 },
-            Size::Long => imm_long(pc, &mut len)
-        };
+        let imm = immediate(pc, size, &mut len);
         let ea = decode_ea(pc, 0, size, &mut len).unwrap();
         Ok((ADDI(size, imm, ea), len))
     }),
@@ -471,10 +474,7 @@ fn all_decoders() -> Vec<SingleDecoder> { vec![
     ], |pc| {
         let mut len = 1;
         let size = decode_size(pc, 6).unwrap();
-        let imm = match size {
-            Size::Byte | Size::Word => { len += 1; pc[1] as u32 },
-            Size::Long => imm_long(pc, &mut len)
-        };
+        let imm = immediate(pc, size, &mut len);
         let ea = decode_ea(pc, 0, size, &mut len).unwrap();
         Ok((ANDI(size, imm, ea), len))
     }),
@@ -721,10 +721,7 @@ fn all_decoders() -> Vec<SingleDecoder> { vec![
     ], |pc| {
         let mut len = 1;
         let size = decode_size(pc, 6).unwrap();
-        let imm = match size {
-            Size::Byte | Size::Word => { len += 1; pc[1] as u32 },
-            Size::Long => imm_long(pc, &mut len)
-        };
+        let imm = immediate(pc, size, &mut len);
         let ea = decode_ea(pc, 0, size, &mut len).unwrap();
         Ok((CMPI(size, imm, ea), len))
     }),
@@ -795,10 +792,7 @@ fn all_decoders() -> Vec<SingleDecoder> { vec![
     ], |pc| {
         let mut len = 1;
         let size = decode_size(pc, 6).unwrap();
-        let imm = match size {
-            Size::Byte | Size::Word => { len += 1; pc[1] as u32 },
-            Size::Long => imm_long(pc, &mut len)
-        };
+        let imm = immediate(pc, size, &mut len);
         let ea = decode_ea(pc, 0, size, &mut len).unwrap();
         Ok((EORI(size, imm, ea), len))
     }),
@@ -1222,10 +1216,7 @@ fn all_decoders() -> Vec<SingleDecoder> { vec![
     ], |pc| {
         let mut len = 1;
         let size = decode_size(pc, 6).unwrap();
-        let imm = match size {
-            Size::Byte | Size::Word => { len += 1; pc[1] as u32 },
-            Size::Long => imm_long(pc, &mut len)
-        };
+        let imm = immediate(pc, size, &mut len);
         let ea = decode_ea(pc, 0, size, &mut len).unwrap();
         Ok((ORI(size, imm, ea), len))
     }),
@@ -1446,10 +1437,7 @@ fn all_decoders() -> Vec<SingleDecoder> { vec![
     ], |pc| {
         let mut len = 1;
         let size = decode_size(pc, 6).unwrap();
-        let imm = match size {
-            Size::Byte | Size::Word => { len += 1; pc[1] as u32 },
-            Size::Long => imm_long(pc, &mut len)
-        };
+        let imm = immediate(pc, size, &mut len);
         let ea = decode_ea(pc, 0, size, &mut len).unwrap();
         Ok((SUBI(size, imm, ea), len))
     }),
@@ -1824,11 +1812,28 @@ fn test_decoders() {
         &[0b0101_101_0_10_100010],
         ADDQ(Size::Long, 5, EA::AddrPreDec(2))
     );
-    // ADDX_Data
-    // ADDX_Addr
-    // AND_to_Data
-    // AND_to_EA
-    // ANDI
+    check_decode(&d,
+        &[0b1101_101_1_10_00_0_010],
+        ADDX_Data(Size::Long, 2, 5)
+    );
+    check_decode(&d,
+        &[0b1101_101_1_10_00_1_010],
+        ADDX_Addr(Size::Long, 2, 5)
+    );
+    check_decode(&d,
+        &[0b1100_101_0_10_100010],
+        AND_to_Data(Size::Long, EA::AddrPreDec(2), 5)
+    );
+    check_decode(&d,
+        &[0b1100_001_1_10_100100],
+        AND_to_EA(Size::Long, 1, EA::AddrPreDec(4))
+    );
+    check_decode(&d, &[
+            0b0000_0010_00_010011,
+            0b00000010_00001111,
+        ],
+        ANDI(Size::Byte, 15, EA::AddrIndirect(3))
+    );
     // ASd_Data
     // ASd_to_Data
     // ASd_EA
