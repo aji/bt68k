@@ -704,11 +704,11 @@ fn all_decoders() -> Vec<SingleDecoder> { vec![
         Matcher::Nibble(0b1011),
         Matcher::Any(3), // Dn
         Matcher::Any(1), // size
-        Matcher::Bit(0), Matcher::Bit(1),
+        Matcher::Bit(1), Matcher::Bit(1),
         Matcher::EA(ANY_EA)
     ], |pc| {
         let mut len = 1;
-        let size = decode_size(pc, 6).unwrap();
+        let size = if bit(pc, 8) == 0 { Size::Word } else { Size::Long };
         let ea = decode_ea(pc, 0, size, &mut len).unwrap();
         Ok((CMPA(size, ea, triple(pc, 9)), len))
     }),
@@ -960,12 +960,17 @@ fn all_decoders() -> Vec<SingleDecoder> { vec![
 
     decoder!([ // MOVE <ea>, <ea>
         Matcher::Bit(0), Matcher::Bit(0),
-        Matcher::Size,
+        Matcher::Any(2),
         Matcher::AE(DATA & ALTERABLE),
         Matcher::EA(ANY_EA)
     ], |pc| {
         let mut len = 1;
-        let size = decode_size(pc, 12).unwrap();
+        let size = match (pc[0] >> 12) & 0x3 {
+            0b01 => Size::Byte,
+            0b11 => Size::Word,
+            0b10 => Size::Long,
+            _ => return Err(MatchError::Mismatch)
+        };
         // source comes first!
         let src = decode_ea(pc, 0, size, &mut len).unwrap();
         let dst = decode_ae(pc, 6, size, &mut len).unwrap();
@@ -1478,7 +1483,7 @@ fn all_decoders() -> Vec<SingleDecoder> { vec![
     }),
 
     decoder!([ // SUBX -(Ay), -(Ax)
-        Matcher::Nibble(0b1101),
+        Matcher::Nibble(0b1001),
         Matcher::Any(3),
         Matcher::Bit(1),
         Matcher::Size,
