@@ -1804,9 +1804,9 @@ fn test_decoders() {
     );
     check_decode(&d, &[
             0b0000_0110_01_010011,
-            0b00000000_00001111,
+            0b00000001_00001111,
         ],
-        ADDI(Size::Word, 15, EA::AddrIndirect(3))
+        ADDI(Size::Word, 271, EA::AddrIndirect(3))
     );
     check_decode(&d,
         &[0b0101_101_0_10_100010],
@@ -1865,7 +1865,7 @@ fn test_decoders() {
     // EXG_Addr
     // EXG_Both
     // EXT
-    // ILLEGAL
+    check_decode(&d, &[0x4afc], ILLEGAL);
     // JMP
     // JSR
     // LEA
@@ -1884,6 +1884,51 @@ fn test_decoders() {
     // MOVE_from_USP
     // MOVE_to_USP
     // MOVEA
+    // MOVEM_Save
+    // MOVEM_Load
+    // MOVEP_Save
+    // MOVEP_Load
+    // MOVEQ
+    // MULS
+    // MULU
+    // NBCD
+    // NEG
+    // NEGX
+    check_decode(&d, &[0x4e71], NOP);
+    // NOT
+    // OR_to_Data
+    // OR_to_EA
+    // ORI
+    // ORI_to_CCR
+    // ORI_to_SR
+    // PEA
+    check_decode(&d, &[0x4e70], RESET);
+    // ROd_Data
+    // ROd_to_Data
+    // ROd_EA
+    // ROXd_Data
+    // ROXd_to_Data
+    // ROXd_EA
+    check_decode(&d, &[0x4e73], RTE);
+    check_decode(&d, &[0x4e77], RTR);
+    check_decode(&d, &[0x4e75], RTS);
+    // SBCD_Data
+    // SBCD_Addr
+    // Scc
+    // STOP
+    // SUB_to_Data
+    // SUB_to_EA
+    // SUBA
+    // SUBI
+    // SUBQ
+    // SUBX_Data
+    // SUBX_Addr
+    // SWAP
+    // TAS
+    // TRAP
+    check_decode(&d, &[0x4e76], TRAPV);
+    // TST
+    // UNLK
 }
 
 #[test]
