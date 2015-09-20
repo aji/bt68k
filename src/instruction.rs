@@ -121,7 +121,7 @@ pub enum Instruction {
     LEA(EA, An),
     LINK(An, i16),
     LSd_Data(Size, Dir, Dx, Dy),
-    LSd_to_Data(Size, Dir, u32, Dy),
+    LSd_to_Data(Size, Dir, u8, Dy),
     LSd_EA(Size, Dir, EA),
     MOVE(Size, EA, EA),
     MOVE_from_CCR(EA),
@@ -151,10 +151,10 @@ pub enum Instruction {
     PEA(EA),
     RESET,
     ROd_Data(Size, Dir, Dx, Dy),
-    ROd_to_Data(Size, Dir, u32, Dy),
+    ROd_to_Data(Size, Dir, u8, Dy),
     ROd_EA(Size, Dir, EA),
     ROXd_Data(Size, Dir, Dx, Dy),
-    ROXd_to_Data(Size, Dir, u32, Dy),
+    ROXd_to_Data(Size, Dir, u8, Dy),
     ROXd_EA(Size, Dir, EA),
     RTE,
     RTR,
@@ -174,4 +174,38 @@ pub enum Instruction {
     TRAPV,
     TST(Size, EA),
     UNLK(An),
+}
+
+pub trait Immediate {
+    fn as_u8(self)   -> u8;
+    fn as_u16(self)  -> u16;
+    fn as_u32(self)  -> u32;
+}
+
+impl Immediate for u8 {
+    fn as_u8(self)   -> u8   { self as u8  }
+    fn as_u16(self)  -> u16  { self as u16 }
+    fn as_u32(self)  -> u32  { self as u32 }
+}
+
+impl Immediate for u16 {
+    fn as_u8(self)   -> u8   { self as u8  }
+    fn as_u16(self)  -> u16  { self as u16 }
+    fn as_u32(self)  -> u32  { self as u32 }
+}
+
+impl Immediate for u32 {
+    fn as_u8(self)   -> u8   { self as u8  }
+    fn as_u16(self)  -> u16  { self as u16 }
+    fn as_u32(self)  -> u32  { self as u32 }
+}
+
+impl EA {
+    pub fn imm_of_size<T: Immediate>(sz: Size, x: T) -> EA {
+        match sz {
+            Size::Byte  => EA::ImmByte(x.as_u8()),
+            Size::Word  => EA::ImmWord(x.as_u16()),
+            Size::Long  => EA::ImmLong(x.as_u32()),
+        }
+    }
 }
