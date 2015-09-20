@@ -955,7 +955,7 @@ fn all_decoders() -> Vec<SingleDecoder> { vec![
         let mut len = 1;
         let dir = if bit(pc, 8) == 0 { Dir::Right } else { Dir::Left };
         let ea = decode_ea(pc, 0, Size::Word, &mut len).unwrap();
-        Ok((ASd_EA(dir, ea), len))
+        Ok((LSd_EA(dir, ea), len))
     }),
 
     decoder!([ // MOVE <ea>, <ea>
@@ -1045,10 +1045,463 @@ fn all_decoders() -> Vec<SingleDecoder> { vec![
     ], |pc| {
         let mut len = 1;
         let size = if bit(pc, 12) == 0 { Size::Long } else { Size::Word };
-        let ea = decode_ea(pc, 0, size, &mut len);
+        let ea = decode_ea(pc, 0, size, &mut len).unwrap();
         Ok((MOVEA(size, ea, triple(pc, 9)), len))
     }),
 
+    // TODO: MOVEM
+
+    // TODO: MOVEP
+
+    decoder!([ // MOVEQ #<data>, Dn
+        Matcher::Nibble(0b0111),
+        Matcher::Any(3),
+        Matcher::Bit(0),
+        Matcher::Any(8),
+    ], |pc| {
+        Ok((MOVEQ((pc[0] & 0xff) as i8, triple(pc, 9)), 1))
+    }),
+
+    decoder!([ // MULS <ea>, Dn
+        Matcher::Nibble(0b1100),
+        Matcher::Any(3),
+        Matcher::Bit(1), Matcher::Bit(1), Matcher::Bit(1),
+        Matcher::EA(DATA)
+    ], |pc| {
+        let mut len = 1;
+        let ea = decode_ea(pc, 0, Size::Word, &mut len).unwrap();
+        Ok((MULS(ea, triple(pc, 9)), len))
+    }),
+
+    decoder!([ // MULU <ea>, Dn
+        Matcher::Nibble(0b1100),
+        Matcher::Any(3),
+        Matcher::Bit(0), Matcher::Bit(1), Matcher::Bit(1),
+        Matcher::EA(DATA)
+    ], |pc| {
+        let mut len = 1;
+        let ea = decode_ea(pc, 0, Size::Word, &mut len).unwrap();
+        Ok((MULS(ea, triple(pc, 9)), len))
+    }),
+
+    decoder!([ // NBCD <ea>
+        Matcher::Nibble(0b0100),
+        Matcher::Nibble(0b1000),
+        Matcher::Bit(0), Matcher::Bit(0),
+        Matcher::EA(DATA & ALTERABLE),
+    ], |pc| {
+        let mut len = 1;
+        let ea = decode_ea(pc, 0, Size::Byte, &mut len).unwrap();
+        Ok((NBCD(ea), len))
+    }),
+
+    decoder!([ // NEG <ea>
+        Matcher::Nibble(0b0100),
+        Matcher::Nibble(0b0100),
+        Matcher::Size,
+        Matcher::EA(DATA & ALTERABLE),
+    ], |pc| {
+        let mut len = 1;
+        let size = decode_size(pc, 6).unwrap();
+        let ea = decode_ea(pc, 0, size, &mut len).unwrap();
+        Ok((NEG(size, ea), len))
+    }),
+
+    decoder!([ // NEGX <ea>
+        Matcher::Nibble(0b0100),
+        Matcher::Nibble(0b0000),
+        Matcher::Size,
+        Matcher::EA(DATA & ALTERABLE),
+    ], |pc| {
+        let mut len = 1;
+        let size = decode_size(pc, 6).unwrap();
+        let ea = decode_ea(pc, 0, size, &mut len).unwrap();
+        Ok((NEG(size, ea), len))
+    }),
+
+    decoder!([ // NOP
+        Matcher::Word(0b0100111001110001),
+    ], |_| {
+        Ok((NOP, 1))
+    }),
+
+    decoder!([ // NOT
+        Matcher::Nibble(0b0100),
+        Matcher::Nibble(0b0110),
+        Matcher::Size,
+        Matcher::EA(DATA & ALTERABLE),
+    ], |pc| {
+        let mut len = 1;
+        let size = decode_size(pc, 6).unwrap();
+        let ea = decode_ea(pc, 0, size, &mut len).unwrap();
+        Ok((NOT(size, ea), len))
+    }),
+
+    decoder!([ // OR <ea>, Dn
+        Matcher::Nibble(0b1000),
+        Matcher::Any(3),
+        Matcher::Bit(0),
+        Matcher::Size,
+        Matcher::EA(DATA)
+    ], |pc| {
+        let mut len = 1;
+        let size = decode_size(pc, 6).unwrap();
+        let ea = decode_ea(pc, 0, size, &mut len).unwrap();
+        Ok((OR_to_Data(size, ea, triple(pc, 9)), len))
+    }),
+
+    decoder!([ // OR Dn, <ea>
+        Matcher::Nibble(0b1000),
+        Matcher::Any(3),
+        Matcher::Bit(1),
+        Matcher::Size,
+        Matcher::EA(MEMORY & ALTERABLE)
+    ], |pc| {
+        let mut len = 1;
+        let size = decode_size(pc, 6).unwrap();
+        let ea = decode_ea(pc, 0, size, &mut len).unwrap();
+        Ok((OR_to_EA(size, triple(pc, 9), ea), len))
+    }),
+
+    decoder!([ // ORI #<data>, <ea>
+        Matcher::Nibble(0b0000),
+        Matcher::Nibble(0b0000),
+        Matcher::Size,
+        Matcher::EA(DATA & ALTERABLE),
+    ], |pc| {
+        let mut len = 1;
+        let size = decode_size(pc, 6).unwrap();
+        let imm = match size {
+            Size::Byte | Size::Word => { len += 1; pc[1] as u32 },
+            Size::Long => imm_long(pc, &mut len)
+        };
+        let ea = decode_ea(pc, 0, size, &mut len).unwrap();
+        Ok((ORI(size, imm, ea), len))
+    }),
+
+    decoder!([ // ORI #xxx, CCR
+        Matcher::Word(0b0000000000111100)
+    ], |pc| {
+        Ok((ORI_to_CCR(pc[1] as u8), 2))
+    }),
+
+    decoder!([ // ORI #xxx, SR
+        Matcher::Word(0b0000000001111100)
+    ], |pc| {
+        Ok((ORI_to_SR(pc[1]), 2))
+    }),
+
+    decoder!([ // PEA <ea>
+        Matcher::Nibble(0b0100),
+        Matcher::Nibble(0b1000),
+        Matcher::Bit(0), Matcher::Bit(1),
+        Matcher::EA(CONTROL)
+    ], |pc| {
+        let mut len = 1;
+        let ea = decode_ea(pc, 0, Size::Word, &mut len).unwrap();
+        Ok((PEA(ea), len))
+    }),
+
+    decoder!([ // RESET
+        Matcher::Word(0b0100111001110000)
+    ], |_| {
+        Ok((RESET, 1))
+    }),
+
+    decoder!([ // ROd Dx, Dy
+        Matcher::Nibble(0b1110),
+        Matcher::Any(3), // Dx
+        Matcher::Any(1), // direction
+        Matcher::Size,
+        Matcher::Bit(1),
+        Matcher::Bit(1), Matcher::Bit(1),
+        Matcher::Any(3), // Dy
+    ], |pc| {
+        let size = decode_size(pc, 6).unwrap();
+        let dir = if bit(pc, 8) == 0 { Dir::Right } else { Dir::Left };
+        Ok((ROd_Data(size, dir, triple(pc, 9), triple(pc, 0)), 1))
+    }),
+
+    decoder!([ // ROd #<data>, Dy
+        Matcher::Nibble(0b1110),
+        Matcher::Any(3), // Dx
+        Matcher::Any(1), // direction
+        Matcher::Size,
+        Matcher::Bit(0),
+        Matcher::Bit(1), Matcher::Bit(1),
+        Matcher::Any(3), // Dy
+    ], |pc| {
+        let size = decode_size(pc, 6).unwrap();
+        let dir = if bit(pc, 8) == 0 { Dir::Right } else { Dir::Left };
+        Ok((ROd_to_Data(size, dir, triple(pc, 9), triple(pc, 0)), 1))
+    }),
+
+    decoder!([ // ROd <ea>
+        Matcher::Nibble(0b1110),
+        Matcher::Bit(0), Matcher::Bit(1), Matcher::Bit(1),
+        Matcher::Any(1), // direction
+        Matcher::Bit(1), Matcher::Bit(1),
+        Matcher::EA(MEMORY & ALTERABLE)
+    ], |pc| {
+        let mut len = 1;
+        let dir = if bit(pc, 8) == 0 { Dir::Right } else { Dir::Left };
+        let ea = decode_ea(pc, 0, Size::Word, &mut len).unwrap();
+        Ok((ROd_EA(dir, ea), len))
+    }),
+
+    decoder!([ // ROXd Dx, Dy
+        Matcher::Nibble(0b1110),
+        Matcher::Any(3), // Dx
+        Matcher::Any(1), // direction
+        Matcher::Size,
+        Matcher::Bit(1),
+        Matcher::Bit(1), Matcher::Bit(0),
+        Matcher::Any(3), // Dy
+    ], |pc| {
+        let size = decode_size(pc, 6).unwrap();
+        let dir = if bit(pc, 8) == 0 { Dir::Right } else { Dir::Left };
+        Ok((ROXd_Data(size, dir, triple(pc, 9), triple(pc, 0)), 1))
+    }),
+
+    decoder!([ // ROXd #<data>, Dy
+        Matcher::Nibble(0b1110),
+        Matcher::Any(3), // Dx
+        Matcher::Any(1), // direction
+        Matcher::Size,
+        Matcher::Bit(0),
+        Matcher::Bit(1), Matcher::Bit(0),
+        Matcher::Any(3), // Dy
+    ], |pc| {
+        let size = decode_size(pc, 6).unwrap();
+        let dir = if bit(pc, 8) == 0 { Dir::Right } else { Dir::Left };
+        Ok((ROXd_to_Data(size, dir, triple(pc, 9), triple(pc, 0)), 1))
+    }),
+
+    decoder!([ // ROXd <ea>
+        Matcher::Nibble(0b1110),
+        Matcher::Bit(0), Matcher::Bit(1), Matcher::Bit(0),
+        Matcher::Any(1), // direction
+        Matcher::Bit(1), Matcher::Bit(1),
+        Matcher::EA(MEMORY & ALTERABLE)
+    ], |pc| {
+        let mut len = 1;
+        let dir = if bit(pc, 8) == 0 { Dir::Right } else { Dir::Left };
+        let ea = decode_ea(pc, 0, Size::Word, &mut len).unwrap();
+        Ok((ROXd_EA(dir, ea), len))
+    }),
+
+    decoder!([ // RTE
+        Matcher::Word(0b0100111001110011),
+    ], |_| {
+        Ok((RTE, 1))
+    }),
+
+    decoder!([ // RTR
+        Matcher::Word(0b0100111001110111),
+    ], |_| {
+        Ok((RTR, 1))
+    }),
+
+    decoder!([ // RTS
+        Matcher::Word(0b0100111001110101),
+    ], |_| {
+        Ok((RTS, 1))
+    }),
+
+    decoder!([ // SBCD Dy, Dx
+        Matcher::Nibble(0b1000),
+        Matcher::Any(3),
+        Matcher::Bit(1),
+        Matcher::Nibble(0b0000),
+        Matcher::Bit(0),
+        Matcher::Any(3)
+    ], |pc| {
+        Ok((SBCD_Data(triple(pc, 0), triple(pc, 9)), 1))
+    }),
+
+    decoder!([ // SBCD -(Ay), -(Ax)
+        Matcher::Nibble(0b1000),
+        Matcher::Any(3),
+        Matcher::Bit(1),
+        Matcher::Nibble(0b0000),
+        Matcher::Bit(1),
+        Matcher::Any(3)
+    ], |pc| {
+        Ok((SBCD_Addr(triple(pc, 0), triple(pc, 9)), 1))
+    }),
+
+    decoder!([ // Scc <ea>
+        Matcher::Nibble(0b0101),
+        Matcher::Cond(ANY_COND),
+        Matcher::Bit(1), Matcher::Bit(1),
+        Matcher::EA(DATA & ALTERABLE),
+    ], |pc| {
+        let mut len = 1;
+        let cond = decode_cond(pc, 8).unwrap();
+        let ea = decode_ea(pc, 0, Size::Byte, &mut len).unwrap();
+        Ok((Scc(cond, ea), len))
+    }),
+
+    decoder!([ // STOP #xxx
+        Matcher::Word(0b0100111001110010),
+    ], |pc| {
+        Ok((STOP(pc[1]), 2))
+    }),
+
+    decoder!([ // SUB <ea>, Dn
+        Matcher::Nibble(0b1001),
+        Matcher::Any(3),
+        Matcher::Bit(0),
+        Matcher::Size,
+        Matcher::EA(ANY_EA),
+    ], |pc| {
+        let mut len = 1;
+        let size = decode_size(pc, 6).unwrap();
+        let ea = decode_ea(pc, 0, size, &mut len).unwrap();
+        Ok((SUB_to_Data(size, ea, triple(pc, 9)), len))
+    }),
+
+    decoder!([ // SUB Dn, <ea>
+        Matcher::Nibble(0b1001),
+        Matcher::Any(3),
+        Matcher::Bit(1),
+        Matcher::Size,
+        Matcher::EA(MEMORY & ALTERABLE),
+    ], |pc| {
+        let mut len = 1;
+        let size = decode_size(pc, 6).unwrap();
+        let ea = decode_ea(pc, 0, size, &mut len).unwrap();
+        Ok((SUB_to_EA(size, triple(pc, 9), ea), len))
+    }),
+
+    decoder!([ // SUBA <ea>, An
+        Matcher::Nibble(0b1001),
+        Matcher::Any(3),
+        Matcher::Any(1),
+        Matcher::Bit(1), Matcher::Bit(1),
+        Matcher::EA(ANY_EA),
+    ], |pc| {
+        let mut len = 1;
+        let size = if bit(pc, 8) == 0 { Size::Word } else { Size::Long };
+        let ea = decode_ea(pc, 0, size, &mut len).unwrap();
+        Ok((SUBA(size, ea, triple(pc, 9)), len))
+    }),
+
+    decoder!([ // SUBI #<data>, <ea>
+        Matcher::Nibble(0b0000),
+        Matcher::Nibble(0b0100),
+        Matcher::Size,
+        Matcher::EA(DATA & ALTERABLE)
+    ], |pc| {
+        let mut len = 1;
+        let size = decode_size(pc, 6).unwrap();
+        let imm = match size {
+            Size::Byte | Size::Word => { len += 1; pc[1] as u32 },
+            Size::Long => imm_long(pc, &mut len)
+        };
+        let ea = decode_ea(pc, 0, size, &mut len).unwrap();
+        Ok((SUBI(size, imm, ea), len))
+    }),
+
+    decoder!([ // SUBQ #<data>, <ea>
+        Matcher::Nibble(0b0101),
+        Matcher::Any(3),
+        Matcher::Bit(1),
+        Matcher::Size,
+        Matcher::EA(DATA & ALTERABLE)
+    ], |pc| {
+        let mut len = 1;
+        let size = decode_size(pc, 6).unwrap();
+        let imm = triple(pc, 9);
+        let ea = decode_ea(pc, 0, size, &mut len).unwrap();
+        Ok((SUBQ(size, imm, ea), len))
+    }),
+
+    decoder!([ // SUBX Dy, Dx
+        Matcher::Nibble(0b1001),
+        Matcher::Any(3),
+        Matcher::Bit(1),
+        Matcher::Size,
+        Matcher::Bit(0),
+        Matcher::Bit(0),
+        Matcher::Bit(0),
+        Matcher::Any(3),
+    ], |pc| {
+        let size = decode_size(pc, 6).unwrap();
+        Ok((SUBX_Data(size, triple(pc, 0), triple(pc, 9)), 1))
+    }),
+
+    decoder!([ // SUBX -(Ay), -(Ax)
+        Matcher::Nibble(0b1101),
+        Matcher::Any(3),
+        Matcher::Bit(1),
+        Matcher::Size,
+        Matcher::Bit(0),
+        Matcher::Bit(0),
+        Matcher::Bit(1),
+        Matcher::Any(3),
+    ], |pc| {
+        let size = decode_size(pc, 6).unwrap();
+        Ok((SUBX_Addr(size, triple(pc, 0), triple(pc, 9)), 1))
+    }),
+
+    decoder!([ // SWAP Dn
+        Matcher::Nibble(0b0100),
+        Matcher::Nibble(0b1000),
+        Matcher::Nibble(0b0100),
+        Matcher::Bit(0),
+        Matcher::Any(3),
+    ], |pc| {
+        Ok((SWAP(triple(pc, 0)), 1))
+    }),
+
+    decoder!([ // TAS <ea>
+        Matcher::Nibble(0b0100),
+        Matcher::Nibble(0b1010),
+        Matcher::Bit(1), Matcher::Bit(1),
+        Matcher::EA(DATA & ALTERABLE),
+    ], |pc| {
+        let mut len = 1;
+        let ea = decode_ea(pc, 0, Size::Byte, &mut len).unwrap();
+        Ok((TAS(ea), len))
+    }),
+
+    decoder!([ // TRAP #<vector>
+        Matcher::Nibble(0b0100),
+        Matcher::Nibble(0b1110),
+        Matcher::Nibble(0b0100),
+        Matcher::Any(4),
+    ], |pc| {
+        Ok((TRAP((pc[0] & 0xf) as u8), 1))
+    }),
+
+    decoder!([ // TRAPV
+        Matcher::Word(0b0100111001110110),
+    ], |_| {
+        Ok((TRAPV, 1))
+    }),
+
+    decoder!([ // TST <ea>
+        Matcher::Nibble(0b0100),
+        Matcher::Nibble(0b1010),
+        Matcher::Size,
+        Matcher::EA(DATA & ALTERABLE),
+    ], |pc| {
+        let mut len = 1;
+        let size = decode_size(pc, 6).unwrap();
+        let ea = decode_ea(pc, 0, size, &mut len).unwrap();
+        Ok((TST(size, ea), len))
+    }),
+
+    decoder!([ // UNLK An
+        Matcher::Nibble(0b0100),
+        Matcher::Nibble(0b1110),
+        Matcher::Nibble(0b0101),
+        Matcher::Bit(1),
+        Matcher::Any(3),
+    ], |pc| {
+        Ok((UNLK(triple(pc, 0)), 1))
+    }),
 ] }
 
 /// A decoder for a single instruction. Pairs a list of matchers with a decoder

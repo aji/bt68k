@@ -75,7 +75,7 @@ pub enum Opcode {
 }
 
 impl Ortho {
-    fn from_instruction(i: Instruction) -> Ortho {
+    pub fn from_instruction(i: Instruction) -> Ortho {
         match i {
         ABCD_Data(dy, dx) => Ortho {
             size: Some(Size::Byte),
