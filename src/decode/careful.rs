@@ -1096,7 +1096,7 @@ fn all_decoders() -> Vec<SingleDecoder> { vec![
         Matcher::Any(3),
     ], |pc| {
         let size = if bit(pc, 6) == 0 { Size::Word } else { Size::Long };
-        Ok((MOVEP_Load(size, triple(pc, 9), pc[1] as i16, triple(pc, 0)), 2))
+        Ok((MOVEP_Load(size, pc[1] as i16, triple(pc, 0), triple(pc, 9)), 2))
     }),
 
     decoder!([ // MOVEQ #<data>, Dn
