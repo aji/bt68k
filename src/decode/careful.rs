@@ -1,3 +1,6 @@
+// decode/careful.rs -- Careful 68000 instruction decoder
+// Copyright (C) 2015 Alex Iadicicco
+
 /// A careful but slow decoder. Follows the spec as closely as possible.
 /// Alternate decoders are checked against this decoder for correctness, but
 /// otherwise its use is limited. It can also be used for generating instruction
