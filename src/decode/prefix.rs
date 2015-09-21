@@ -6,7 +6,7 @@
 /// decodings.
 
 pub use decode::{Decoder, DecodeResult};
-use instruction::*;
+//use instruction::*;
 
 pub struct PrefixDecoder;
 
@@ -41,26 +41,26 @@ impl Decoder<()> for PrefixDecoder {
     }
 }
 
-fn bit_manip_movep_imm(pc: &[u16]) -> DecodeResult { Err(()) }
+fn bit_manip_movep_imm(_pc: &[u16]) -> DecodeResult { Err(()) }
 
-fn move_size(pc: &[u16]) -> DecodeResult { Err(()) }
+fn move_size(_pc: &[u16]) -> DecodeResult { Err(()) }
 
-fn miscellaneous(pc: &[u16]) -> DecodeResult { Err(()) }
+fn miscellaneous(_pc: &[u16]) -> DecodeResult { Err(()) }
 
-fn addq_subq_scc_dbcc(pc: &[u16]) -> DecodeResult { Err(()) }
+fn addq_subq_scc_dbcc(_pc: &[u16]) -> DecodeResult { Err(()) }
 
-fn bcc_bsr(pc: &[u16]) -> DecodeResult { Err(()) }
+fn bcc_bsr(_pc: &[u16]) -> DecodeResult { Err(()) }
 
-fn moveq(pc: &[u16]) -> DecodeResult { Err(()) }
+fn moveq(_pc: &[u16]) -> DecodeResult { Err(()) }
 
-fn or_div_sbcd(pc: &[u16]) -> DecodeResult { Err(()) }
+fn or_div_sbcd(_pc: &[u16]) -> DecodeResult { Err(()) }
 
-fn sub_subx(pc: &[u16]) -> DecodeResult { Err(()) }
+fn sub_subx(_pc: &[u16]) -> DecodeResult { Err(()) }
 
-fn cmp_eor(pc: &[u16]) -> DecodeResult { Err(()) }
+fn cmp_eor(_pc: &[u16]) -> DecodeResult { Err(()) }
 
-fn and_mul_abcd_exg(pc: &[u16]) -> DecodeResult { Err(()) }
+fn and_mul_abcd_exg(_pc: &[u16]) -> DecodeResult { Err(()) }
 
-fn add_addx(pc: &[u16]) -> DecodeResult { Err(()) }
+fn add_addx(_pc: &[u16]) -> DecodeResult { Err(()) }
 
-fn shift_rotate(pc: &[u16]) -> DecodeResult { Err(()) }
+fn shift_rotate(_pc: &[u16]) -> DecodeResult { Err(()) }
