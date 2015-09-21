@@ -1,6 +1,7 @@
 use instruction;
 
 pub mod careful;
+pub mod common;
 pub mod prefix;
 
 pub type DecodeResult = Result<(instruction::Instruction, usize), ()>;

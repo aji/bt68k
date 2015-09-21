@@ -6,7 +6,8 @@
 /// decodings.
 
 pub use decode::{Decoder, DecodeResult};
-//use instruction::*;
+pub use decode::common::*;
+use instruction::*;
 
 pub struct PrefixDecoder;
 
@@ -43,7 +44,22 @@ impl Decoder<()> for PrefixDecoder {
 
 fn bit_manip_movep_imm(_pc: &[u16]) -> DecodeResult { Err(()) }
 
-fn move_size(_pc: &[u16]) -> DecodeResult { Err(()) }
+fn move_size(pc: &[u16]) -> DecodeResult {
+    let mut len = 1;
+
+    let size = match (pc[0] >> 12) & 0x3 {
+        0b01 => Size::Byte,
+        0b11 => Size::Word,
+        0b10 => Size::Long,
+        _ => return Err(()),
+    };
+
+    // source comes first!
+    let src = decode_ea(pc, 0, size, &mut len).unwrap();
+    let dst = decode_ae(pc, 6, size, &mut len).unwrap();
+
+    Ok((MOVE(size, src, dst), len))
+}
 
 fn miscellaneous(_pc: &[u16]) -> DecodeResult { Err(()) }
 
