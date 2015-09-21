@@ -1,7 +1,7 @@
 // exec/interpret.rs -- Slow instruction interpreter
 // Copyright (C) 2015 Alex Iadicicco
 
-use decode::careful::CarefulDecoder;
+use decode::prefix::PrefixDecoder;
 use decode::Decoder;
 use exec::{CPU, Memory};
 use instruction::*;
@@ -10,7 +10,7 @@ pub struct Interpreter<M> {
     cpu: CPU,
     mem: M,
 
-    decoder: CarefulDecoder,
+    decoder: PrefixDecoder,
 
     icache_base: u32,
     icache: Vec<u16>,
@@ -24,7 +24,7 @@ impl<M> Interpreter<M> {
             cpu: cpu,
             mem: mem,
 
-            decoder: CarefulDecoder::new(),
+            decoder: PrefixDecoder::new(),
 
             icache_base: 0,
             icache: Vec::new(),
