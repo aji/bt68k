@@ -13,11 +13,13 @@ pub struct Interpreter<M> {
     decoder: CarefulDecoder,
 
     icache_base: u32,
-    icache: Vec<u16>
+    icache: Vec<u16>,
+
+    debug: bool,
 }
 
 impl<M> Interpreter<M> {
-    pub fn new(cpu: CPU, mem: M) -> Interpreter<M> {
+    pub fn new(cpu: CPU, mem: M, debug: bool) -> Interpreter<M> {
         Interpreter {
             cpu: cpu,
             mem: mem,
@@ -26,6 +28,8 @@ impl<M> Interpreter<M> {
 
             icache_base: 0,
             icache: Vec::new(),
+
+            debug: debug,
         }
     }
 
@@ -65,7 +69,9 @@ impl<M: Memory> Interpreter<M> {
             Err(_) => return false
         };
 
-        println!("pc={:08x} {:?}", self.cpu.pc, inst);
+        if self.debug {
+            println!("pc={:08x} {:?}", self.cpu.pc, inst);
+        }
 
         let res = match inst {
             ADD_to_Data(sz, ea, dn) => {
