@@ -1,0 +1,125 @@
+//! Execution engines will run a 68000 program. Given a CPU state and a memory
+//! layout, they decode instructions and execute them according to some scheme.
+//! Execution engines will stop after any branch, at which point the program
+//! counter indicates the location of the next instruction to be executed. There
+//! is no cycle counting.
+
+use std::fmt;
+
+pub mod interpret;
+
+/// CPU state representation. The whole thing!
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct CPU {
+    #[doc="Data registers"]              pub data: [u32; 8],
+    #[doc="Address registers"]           pub addr: [u32; 8],
+    #[doc="Supervisor stack pointer"]    pub ssp: u32,
+    #[doc="Program counter"]             pub pc: u32,
+    #[doc="Status register"]             pub status: u16,
+}
+
+impl CPU {
+    pub fn new() -> CPU {
+        CPU {
+            data: [0; 8],
+            addr: [0; 8],
+            ssp: 0,
+            pc: 0,
+            status: 0,
+        }
+    }
+}
+
+impl fmt::Display for CPU {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "68000 status:\n  \
+            d0={:08x} d1={:08x} d2={:08x} d3={:08x}  X={}\n  \
+            d4={:08x} d5={:08x} d6={:08x} d7={:08x}  N={}\n  \
+            a0={:08x} a1={:08x} a2={:08x} a3={:08x}  Z={}\n  \
+            a4={:08x} a5={:08x} a6={:08x} a7={:08x}  V={}\n  \
+            status={:08b} {:03b}    ssp={:08x} pc={:08x}  C={}",
+            self.data[0], self.data[1], self.data[2], self.data[3],
+            (self.status >> 4) & 1,
+            self.data[4], self.data[5], self.data[6], self.data[7],
+            (self.status >> 3) & 1,
+            self.addr[0], self.addr[1], self.addr[2], self.addr[3],
+            (self.status >> 2) & 1,
+            self.addr[4], self.addr[5], self.addr[6], self.addr[7],
+            (self.status >> 1) & 1,
+            self.status >> 8,
+            (self.status >> 5) & 0x7,
+            self.ssp, self.pc,
+            (self.status >> 0) & 1,
+        )
+    }
+}
+
+/// A trait representing a memory layout
+pub trait Memory {
+    fn ref16(&self, addr: u32) -> Option<&u16>;
+    fn ref16_mut(&mut self, addr: u32) -> Option<&mut u16>;
+
+    fn read8(&self, addr: u32) -> u8 {
+        match self.ref16(addr) {
+            Some(x) =>
+                if (addr & 1) == 0 {
+                    (*x >> 8) as u8
+                } else {
+                    *x as u8
+                },
+
+            None => 0
+        }
+    }
+
+    fn write8(&mut self, addr: u32, data: u8) {
+        match self.ref16_mut(addr) {
+            Some(x) =>
+                if (addr & 1) == 0 {
+                    *x = ((data as u16) << 8) | (*x & 0xff);
+                } else {
+                    *x = (data as u16) | (*x & 0xff00);
+                },
+
+            None => { }
+        }
+    }
+
+    fn read16(&self, addr: u32) -> u16 {
+        match self.ref16(addr) {
+            Some(x) => *x,
+            None    => 0
+        }
+    }
+
+    fn write16(&mut self, addr: u32, data: u16) {
+        match self.ref16_mut(addr) {
+            Some(x) => *x = data,
+            None    => { }
+        }
+    }
+}
+
+impl<'a> Memory for &'a mut [u16] {
+    fn ref16(&self, addr: u32) -> Option<&u16> {
+        let index = (addr >> 1) as usize;
+        if index >= self.len() { None } else { Some(&self[index]) }
+    }
+
+    fn ref16_mut(&mut self, addr: u32) -> Option<&mut u16> {
+        let index = (addr >> 1) as usize;
+        if index >= self.len() { None } else { Some(&mut self[index]) }
+    }
+}
+
+impl<'a> Memory for &'a [u16] {
+    fn ref16(&self, addr: u32) -> Option<&u16> {
+        let index = (addr >> 1) as usize;
+        if index >= self.len() { None } else { Some(&self[index]) }
+    }
+
+    fn ref16_mut(&mut self, _addr: u32) -> Option<&mut u16> {
+        None
+    }
+}
