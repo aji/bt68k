@@ -1,6 +1,8 @@
 use instruction;
 
+#[cfg(test)]
 pub mod careful;
+
 pub mod common;
 pub mod prefix;
 
