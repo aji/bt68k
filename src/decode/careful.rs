@@ -203,7 +203,7 @@ impl Matcher {
 }
 
 /// A decoder function for a single instruction match
-type DecodeFn = Box<Fn(&[u16]) -> DecodeResult<MatchError>>;
+type DecodeFn = Box<Fn(&[u16]) -> Result<(Instruction, usize), MatchError>>;
 
 /// A macro for generating an instruction decoder expression. `$matchers` is
 /// an array of Matcher instances totaling 16 bits, and `body` is a closure
@@ -1559,16 +1559,14 @@ struct SingleDecoder {
 
 impl SingleDecoder {
     fn new<F: 'static>(matchers: Vec<Matcher>, decode: F) -> SingleDecoder
-    where F: Fn(&[u16]) -> DecodeResult<MatchError> {
+    where F: Fn(&[u16]) -> Result<(Instruction, usize), MatchError> {
         SingleDecoder {
             matchers:   matchers,
             decode_fn:  Box::new(decode),
         }
     }
-}
 
-impl Decoder<MatchError> for SingleDecoder {
-    fn decode(&self, pc: &[u16]) -> DecodeResult<MatchError> {
+    fn decode(&self, pc: &[u16]) -> Result<(Instruction, usize), MatchError> {
         let instr = pc[0] as u32;
         let mut offset = 16;
 
@@ -1610,7 +1608,7 @@ impl CarefulDecoder {
 }
 
 impl Decoder<()> for CarefulDecoder {
-    fn decode(&self, pc: &[u16]) -> DecodeResult<()> {
+    fn decode(&self, pc: &[u16]) -> DecodeResult {
         for d in self.decoders.iter() {
             match d.decode(pc) {
                 Ok(result) => return Ok(result),

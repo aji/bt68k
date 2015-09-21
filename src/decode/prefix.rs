@@ -17,7 +17,7 @@ impl PrefixDecoder {
 }
 
 impl Decoder<()> for PrefixDecoder {
-    fn decode(&self, pc: &[u16]) -> DecodeResult<()> {
+    fn decode(&self, pc: &[u16]) -> DecodeResult {
         match pc[0] >> 12 {
         0b0000 => bit_manip_movep_imm(pc),
         0b0001 => move_size(pc),
@@ -41,26 +41,26 @@ impl Decoder<()> for PrefixDecoder {
     }
 }
 
-fn bit_manip_movep_imm(pc: &[u16]) -> DecodeResult<()> { Err(()) }
+fn bit_manip_movep_imm(pc: &[u16]) -> DecodeResult { Err(()) }
 
-fn move_size(pc: &[u16]) -> DecodeResult<()> { Err(()) }
+fn move_size(pc: &[u16]) -> DecodeResult { Err(()) }
 
-fn miscellaneous(pc: &[u16]) -> DecodeResult<()> { Err(()) }
+fn miscellaneous(pc: &[u16]) -> DecodeResult { Err(()) }
 
-fn addq_subq_scc_dbcc(pc: &[u16]) -> DecodeResult<()> { Err(()) }
+fn addq_subq_scc_dbcc(pc: &[u16]) -> DecodeResult { Err(()) }
 
-fn bcc_bsr(pc: &[u16]) -> DecodeResult<()> { Err(()) }
+fn bcc_bsr(pc: &[u16]) -> DecodeResult { Err(()) }
 
-fn moveq(pc: &[u16]) -> DecodeResult<()> { Err(()) }
+fn moveq(pc: &[u16]) -> DecodeResult { Err(()) }
 
-fn or_div_sbcd(pc: &[u16]) -> DecodeResult<()> { Err(()) }
+fn or_div_sbcd(pc: &[u16]) -> DecodeResult { Err(()) }
 
-fn sub_subx(pc: &[u16]) -> DecodeResult<()> { Err(()) }
+fn sub_subx(pc: &[u16]) -> DecodeResult { Err(()) }
 
-fn cmp_eor(pc: &[u16]) -> DecodeResult<()> { Err(()) }
+fn cmp_eor(pc: &[u16]) -> DecodeResult { Err(()) }
 
-fn and_mul_abcd_exg(pc: &[u16]) -> DecodeResult<()> { Err(()) }
+fn and_mul_abcd_exg(pc: &[u16]) -> DecodeResult { Err(()) }
 
-fn add_addx(pc: &[u16]) -> DecodeResult<()> { Err(()) }
+fn add_addx(pc: &[u16]) -> DecodeResult { Err(()) }
 
-fn shift_rotate(pc: &[u16]) -> DecodeResult<()> { Err(()) }
+fn shift_rotate(pc: &[u16]) -> DecodeResult { Err(()) }
