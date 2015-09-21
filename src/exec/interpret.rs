@@ -47,6 +47,16 @@ impl<M: Memory> Interpreter<M> {
         self.icache.push(self.mem.read16(self.icache_base + 10));
     }
 
+    fn set_flags(&mut self, x: bool, n: bool, z: bool, v: bool, c: bool) {
+        let bits =
+            (if x { 0b10000 } else { 0 }) |
+            (if n { 0b01000 } else { 0 }) |
+            (if z { 0b00100 } else { 0 }) |
+            (if v { 0b00010 } else { 0 }) |
+            (if c { 0b00001 } else { 0 });
+        self.cpu.status = (self.cpu.status & 0xff00) | bits;
+    }
+
     fn execute_once(&mut self) -> bool {
         self.icache_fetch();
 
@@ -59,14 +69,21 @@ impl<M: Memory> Interpreter<M> {
 
         let res = match inst {
             ADD_to_Data(sz, ea, dn) => {
+                let sh = (sz.size() << 3) - 1;
                 let source = ea.value_of(sz, self);
-                let dest = &mut self.cpu.data[dn as usize];
-                let result = source.wrapping_add(*dest);
-                *dest = match sz {
-                    Size::Byte => (*dest & 0xffffff00) | (result & 0x000000ff),
-                    Size::Word => (*dest & 0xffff0000) | (result & 0x0000ffff),
+                let dest = self.cpu.data[dn as usize];
+                let sm = ((source >> sh) & 1) == 1;
+                let dm = ((dest   >> sh) & 1) == 1;
+                let result = source.wrapping_add(dest);
+                let rm = ((result >> sh) & 1) == 1;
+                self.cpu.data[dn as usize] = match sz {
+                    Size::Byte => (dest & 0xffffff00) | (result & 0x000000ff),
+                    Size::Word => (dest & 0xffff0000) | (result & 0x0000ffff),
                     Size::Long => result
                 };
+                let overflow = (sm && dm && !rm) || (!sm && !dm && rm);
+                let carry = (sm && dm) || (!rm && dm) || (sm && !rm);
+                self.set_flags(carry, rm, result == 0, overflow, carry);
                 true
             },
 

@@ -12,8 +12,8 @@ pub fn main() {
 
     let mut ee = Interpreter::new(CPU::new(), &mut rom[..]);
 
-    println!("running 4 loops of the CPU");
-    for _ in 0..4 {
+    println!("running 35 loops of the CPU");
+    for _ in 0..35 {
         ee.execute();
         println!("{}", ee.cpu());
     }

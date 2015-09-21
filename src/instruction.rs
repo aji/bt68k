@@ -23,6 +23,16 @@ pub enum Size {
     Long
 }
 
+impl Size {
+    pub fn size(self) -> usize {
+        match self {
+            Size::Byte => 1,
+            Size::Word => 2,
+            Size::Long => 4,
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Dir {
     Left,
