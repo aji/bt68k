@@ -1,17 +1,17 @@
 // decode/careful.rs -- Careful 68000 instruction decoder
 // Copyright (C) 2015 Alex Iadicicco
 
-/// A careful but slow decoder. Follows the spec as closely as possible.
-/// Alternate decoders are checked against this decoder for correctness, but
-/// otherwise its use is limited. It can also be used for generating instruction
-/// decoder tables.
-///
-/// The architecture is naive but straightforward and correct. Each valid
-/// instruction encoding is described in a strict pattern micro-language. This
-/// pattern is taken verbatim from the 68000 programmer's reference manual.
-/// Patterns are tried in turn against the encoded instruction word until a
-/// match is found. Patterns are written to be mutually exclusive so that no
-/// more than one is matched for a given instruction word.
+//! A careful but slow decoder. Follows the spec as closely as possible.
+//! Alternate decoders are checked against this decoder for correctness, but
+//! otherwise its use is limited. It can also be used for generating instruction
+//! decoder tables.
+//!
+//! The architecture is naive but straightforward and correct. Each valid
+//! instruction encoding is described in a strict pattern micro-language. This
+//! pattern is taken verbatim from the 68000 programmer's reference manual.
+//! Patterns are tried in turn against the encoded instruction word until a
+//! match is found. Patterns are written to be mutually exclusive so that no
+//! more than one is matched for a given instruction word.
 
 pub use decode::{Decoder, DecodeResult};
 use instruction::*;
