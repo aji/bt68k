@@ -568,7 +568,7 @@ fn all_decoders() -> Vec<SingleDecoder> { vec![
         Matcher::EA(DATA)
     ], |pc| {
         let mut len = 1;
-        let ea = decode_ea(pc, 0, Size::Byte, &mut len).unwrap();
+        let ea = decode_ea(pc, 0, Size::Word, &mut len).unwrap();
         Ok((CHK(ea, triple(pc, 9)), len))
     }),
 
@@ -653,7 +653,7 @@ fn all_decoders() -> Vec<SingleDecoder> { vec![
         Matcher::EA(DATA)
     ], |pc| {
         let mut len = 1;
-        let ea = decode_ea(pc, 0, Size::Byte, &mut len).unwrap();
+        let ea = decode_ea(pc, 0, Size::Word, &mut len).unwrap();
         Ok((DIVS(ea, triple(pc, 9)), len))
     }),
 
@@ -664,7 +664,7 @@ fn all_decoders() -> Vec<SingleDecoder> { vec![
         Matcher::EA(DATA)
     ], |pc| {
         let mut len = 1;
-        let ea = decode_ea(pc, 0, Size::Byte, &mut len).unwrap();
+        let ea = decode_ea(pc, 0, Size::Word, &mut len).unwrap();
         Ok((DIVU(ea, triple(pc, 9)), len))
     }),
 
@@ -868,17 +868,6 @@ fn all_decoders() -> Vec<SingleDecoder> { vec![
         Ok((MOVE(size, src, dst), len))
     }),
 
-    decoder!([ // MOVE CCR, <ea>
-        Matcher::Nibble(0b0100),
-        Matcher::Nibble(0b0010),
-        Matcher::Bit(1), Matcher::Bit(1),
-        Matcher::EA(DATA & ALTERABLE),
-    ], |pc| {
-        let mut len = 1;
-        let ea = decode_ea(pc, 0, Size::Byte, &mut len).unwrap();
-        Ok((MOVE_from_CCR(ea), len))
-    }),
-
     decoder!([ // MOVE <ea>, CCR
         Matcher::Nibble(0b0100),
         Matcher::Nibble(0b0100),
@@ -899,17 +888,6 @@ fn all_decoders() -> Vec<SingleDecoder> { vec![
         let mut len = 1;
         let ea = decode_ea(pc, 0, Size::Word, &mut len).unwrap();
         Ok((MOVE_to_SR(ea), len))
-    }),
-
-    decoder!([ // MOVE SR, <ea>
-        Matcher::Nibble(0b0100),
-        Matcher::Nibble(0b0000),
-        Matcher::Bit(1), Matcher::Bit(1),
-        Matcher::EA(DATA & ALTERABLE),
-    ], |pc| {
-        let mut len = 1;
-        let ea = decode_ea(pc, 0, Size::Word, &mut len).unwrap();
-        Ok((MOVE_from_SR(ea), len))
     }),
 
     decoder!([ // MOVE USP, An
@@ -1023,7 +1001,7 @@ fn all_decoders() -> Vec<SingleDecoder> { vec![
     ], |pc| {
         let mut len = 1;
         let ea = decode_ea(pc, 0, Size::Word, &mut len).unwrap();
-        Ok((MULS(ea, triple(pc, 9)), len))
+        Ok((MULU(ea, triple(pc, 9)), len))
     }),
 
     decoder!([ // NBCD <ea>
@@ -1058,7 +1036,7 @@ fn all_decoders() -> Vec<SingleDecoder> { vec![
         let mut len = 1;
         let size = decode_size(pc, 6).unwrap();
         let ea = decode_ea(pc, 0, size, &mut len).unwrap();
-        Ok((NEG(size, ea), len))
+        Ok((NEGX(size, ea), len))
     }),
 
     decoder!([ // NOP
@@ -1772,10 +1750,8 @@ fn test_decoders() {
         &[0x296c, 0x0003, 0x0005], // GNU m68k-as output
         MOVE(Size::Long, EA::AddrDisplace(4, 3), EA::AddrDisplace(4, 5))
     );
-    // MOVE_from_CCR
     // MOVE_to_CCR
     // MOVE_to_SR
-    // MOVE_from_SR
     // MOVE_from_USP
     // MOVE_to_USP
     // MOVEA
