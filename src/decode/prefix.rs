@@ -1,14 +1,17 @@
 // decode/prefix.rs -- Prefix-based instruction decoder
 // Copyright (C) 2015 Alex Iadicicco
 
-/// With the 68000 instruction set, we can look at the first 4 bits of an
-/// encoded instruction word and significantly reduce the number of possible
-/// decodings.
+//! With the 68000 instruction set, we can look at the first 4 bits of an
+//! encoded instruction word and significantly reduce the number of possible
+//! decodings.
 
 pub use decode::{Decoder, DecodeResult};
 pub use decode::common::*;
 use instruction::*;
 
+/// The prefix decoder speeds up instruction decode time by looking at the first
+/// nibble of the instruction word to significantly narrow down the number of
+/// possible decodings.
 pub struct PrefixDecoder;
 
 impl PrefixDecoder {
