@@ -42,6 +42,15 @@ impl Decoder<()> for PrefixDecoder {
     }
 }
 
+macro_rules! unwrap {
+    ($value:expr) => {
+        match $value {
+            Some(x) => x,
+            None    => return Err(())
+        }
+    }
+}
+
 fn bit_manip_movep_imm(_pc: &[u16]) -> DecodeResult { Err(()) }
 
 fn move_size(pc: &[u16]) -> DecodeResult {
@@ -55,10 +64,14 @@ fn move_size(pc: &[u16]) -> DecodeResult {
     };
 
     // source comes first!
-    let src = decode_ea(pc, 0, size, &mut len).unwrap();
-    let dst = decode_ae(pc, 6, size, &mut len).unwrap();
+    let src = unwrap!(decode_ea(pc, 0, size, &mut len));
 
-    Ok((MOVE(size, src, dst), len))
+    if triple(pc, 6) == 0b001 {
+        Ok((MOVEA(size, src, triple(pc, 9)), len))
+    } else {
+        let dst = unwrap!(decode_ae(pc, 6, size, &mut len));
+        Ok((MOVE(size, src, dst), len))
+    }
 }
 
 fn miscellaneous(_pc: &[u16]) -> DecodeResult { Err(()) }
@@ -80,3 +93,38 @@ fn and_mul_abcd_exg(_pc: &[u16]) -> DecodeResult { Err(()) }
 fn add_addx(_pc: &[u16]) -> DecodeResult { Err(()) }
 
 fn shift_rotate(_pc: &[u16]) -> DecodeResult { Err(()) }
+
+#[test]
+fn verify_all_patterns() {
+    use decode::careful::CarefulDecoder;
+
+    let reference = CarefulDecoder::new();
+    let target = PrefixDecoder::new();
+
+    for i in 0..0x10000 {
+        // The other elements are to verify that any extension words are decoded
+        // identically as well.
+        let pc = [i as u16, 1, 2, 3, 4, 5, 6];
+
+        let rd = reference.decode(&pc);
+        let td = target.decode(&pc);
+
+        if rd.is_err() || td.is_err() {
+            // TODO: Some decoder indicated they were unable to decode the
+            // instruction. Right now we only care about the cases where both
+            // decoders work, but eventually we'll want to fail when the
+            // reference decodes something and the target does not.
+            continue;
+        }
+
+        let (ri, rlen) = rd.unwrap();
+        let (ti, tlen) = td.unwrap();
+
+        println!("0b{:016b}:", i);
+        println!("  ref: {:?} len={}", ri, rlen);
+        println!("  tgt: {:?} len={}", ti, tlen);
+
+        assert!(ri == ti);
+        assert!(rlen == tlen);
+    }
+}
