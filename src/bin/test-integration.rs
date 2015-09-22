@@ -36,7 +36,7 @@ pub fn main() {
         ee.cpu().data[2] == 15
     });
 
-    test!("addl", [
+    test!("addl (3 + 5)", [
         0x7003,          // moveq #3, d0
         0x7205,          // moveq #5, d1
         0xd081,          // addl d1, d0
