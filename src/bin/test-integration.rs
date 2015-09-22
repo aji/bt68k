@@ -29,19 +29,13 @@ macro_rules! test {
 }
 
 pub fn main() {
-    test!("moveq", [
-        0x740f,          // moveq #15, d2
-        0x4efa, 0xfffc,  // jmp -4(pc)
-    ], |ee| {
-        ee.cpu().data[2] == 15
-    });
+test!("just moveq",[0x7002,0x723c,0x74ff,0x4efa,0xfffe],|ee|{
+	(ee.cpu().data[0]) ==  2 &&
+	(ee.cpu().data[1]) == 60 &&
+	(ee.cpu().data[2]) == (-1i32 as u32)
 
-    test!("addl (3 + 5)", [
-        0x7003,          // moveq #3, d0
-        0x7205,          // moveq #5, d1
-        0xd081,          // addl d1, d0
-        0x4efa, 0xfffc,  // jmp -4(pc)
-    ], |ee| {
-        ee.cpu().data[0] == 8
-    });
+});
+test!("addl (3 + 5)",[0x7003,0x7205,0xd081,0x4efa,0xfffe],|ee|{
+	(ee.cpu().data[0]) == 8
+});
 }

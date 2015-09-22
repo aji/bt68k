@@ -38,7 +38,7 @@ class Test(object):
         out_object = '/tmp/bt68k-integration.o'
         out_binary = '/tmp/bt68k-integration.bin'
 
-        print('building {}'.format(self.name))
+        print('Building {}'.format(self.name))
 
         p_as = subprocess.Popen([
                 ARCH + 'as',
