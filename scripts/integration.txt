@@ -8,6 +8,56 @@
 	%d1 == 60 &&
 	%d2 == (-1i32 as u32)
 
+-- test: just move
+	move.l	#0x1234, %d0
+1:	jmp	1b
+--
+	%d0 == 0x1234
+
+-- test: just move, again
+	move.l	#0x12345678, %d0
+	move.l	%d0, %d1
+1:	jmp	1b
+--
+	%d1 == 0x12345678
+
+-- test: move word affects lower word only
+	move.l	#0x12345678, %d0
+	move.l	#0xabcdefab, %d1
+	move.w	%d0, %d1
+1:	jmp	1b
+--
+	%d1 == 0xabcd5678
+
+-- test: move byte affects lower byte only
+	move.l	#0x12345678, %d0
+	move.l	#0xabcdefab, %d1
+	move.b	%d0, %d1
+1:	jmp	1b
+--
+	%d1 == 0xabcdef78
+
+-- test: just movea
+	movea.l	#0x12345678, %a0
+1:	jmp	1b
+--
+	%a0 == 0x12345678
+
+-- test: just movea, again
+	movea.l	#0x12345678, %a0
+	movea.l	%a0, %a1
+1:	jmp	1b
+--
+	%a1 == 0x12345678
+
+-- test: movea word affects whole register
+	movea.l	#0x12345678, %a0
+	movea.l	#0xabcdefab, %a1
+	movea.w	%a0, %a1
+1:	jmp	1b
+--
+	%a1 == 0x00005678
+
 -- test: addl (3 + 5)
 	moveq	#3, %d0
 	moveq	#5, %d1

@@ -6,6 +6,8 @@
 
 use std::fmt;
 
+use instruction::Size;
+
 pub mod interpret;
 
 /// CPU state representation. The whole thing!
@@ -19,6 +21,26 @@ pub struct CPU {
     #[doc="Status register"]             pub status: u16,
 }
 
+// Exception vector numbers
+pub const EXC_RESET_SSP:     u32 =   0;
+pub const EXC_RESET_PC:      u32 =   1;
+pub const EXC_ILLEGAL:       u32 =   4;
+pub const EXC_ZERO_DIV:      u32 =   5;
+pub const EXC_CHK:           u32 =   6;
+pub const EXC_TRAPV:         u32 =   7;
+pub const EXC_PRIV:          u32 =   8;
+pub const EXC_TRACE:         u32 =   9;
+pub const EXC_INT_BASE:      u32 =  24;
+pub const EXC_TRAP_BASE:     u32 =  32;
+pub const EXC_USER_BASE:     u32 =  64;
+
+pub const SUPERVISOR_BIT:    u16 =  0b0010_0000_000_00000;
+pub const X_BIT:             u16 =  0b0000_0000_000_10000;
+pub const N_BIT:             u16 =  0b0000_0000_000_01000;
+pub const Z_BIT:             u16 =  0b0000_0000_000_00100;
+pub const V_BIT:             u16 =  0b0000_0000_000_00010;
+pub const C_BIT:             u16 =  0b0000_0000_000_00001;
+
 impl CPU {
     pub fn new() -> CPU {
         CPU {
@@ -29,6 +51,14 @@ impl CPU {
             status: 0,
         }
     }
+
+    pub fn cc_x(&self) -> bool { (self.status & X_BIT) != 0 }
+    pub fn cc_n(&self) -> bool { (self.status & N_BIT) != 0 }
+    pub fn cc_z(&self) -> bool { (self.status & Z_BIT) != 0 }
+    pub fn cc_v(&self) -> bool { (self.status & V_BIT) != 0 }
+    pub fn cc_c(&self) -> bool { (self.status & C_BIT) != 0 }
+
+    pub fn supervisor(&self) -> bool { (self.status & SUPERVISOR_BIT) != 0 }
 }
 
 impl fmt::Display for CPU {
@@ -97,6 +127,31 @@ pub trait Memory {
         match self.ref16_mut(addr) {
             Some(x) => *x = data,
             None    => { }
+        }
+    }
+
+    fn read32(&self, addr: u32) -> u32 {
+        ((self.read16(addr) as u32) << 16) | (self.read16(addr+1) as u32)
+    }
+
+    fn write32(&mut self, addr: u32, data: u32) {
+        self.write16(addr, (data >> 16) as u16);
+        self.write16(addr+1, data as u16);
+    }
+
+    fn readsz(&self, addr: u32, sz: Size) -> u32 {
+        match sz {
+            Size::Byte => self.read8(addr) as u32,
+            Size::Word => self.read16(addr) as u32,
+            Size::Long => self.read32(addr)
+        }
+    }
+
+    fn writesz(&mut self, addr: u32, sz: Size, data: u32) {
+        match sz {
+            Size::Byte => self.write8(addr, data as u8),
+            Size::Word => self.write16(addr, data as u16),
+            Size::Long => self.write32(addr, data as u32),
         }
     }
 }

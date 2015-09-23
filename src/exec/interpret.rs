@@ -3,6 +3,7 @@
 
 use decode::prefix::PrefixDecoder;
 use decode::Decoder;
+use exec;
 use exec::{CPU, Memory};
 use instruction::*;
 
@@ -61,6 +62,24 @@ impl<M: Memory> Interpreter<M> {
         self.cpu.status = (self.cpu.status & 0xff00) | bits;
     }
 
+    pub fn reset(&mut self) {
+        self.cpu.pc   = self.mem.read32(exec::EXC_RESET_PC);
+        self.cpu.ssp  = self.mem.read32(exec::EXC_RESET_SSP);
+        self.cpu.status |= exec::SUPERVISOR_BIT;
+    }
+
+    pub fn interrupt(&mut self, lev: u32) {
+        self.trap(lev + exec::EXC_INT_BASE);
+    }
+
+    fn trap(&mut self, exc: u32) {
+        let vec = exc << 2;
+        self.mem.write16(self.cpu.ssp,    self.cpu.status);
+        self.mem.write32(self.cpu.ssp+2,  self.cpu.pc);
+        self.cpu.pc = self.mem.read32(vec);
+        self.cpu.status |= exec::SUPERVISOR_BIT;
+    }
+
     fn execute_once(&mut self) -> bool {
         self.icache_fetch();
 
@@ -80,13 +99,26 @@ impl<M: Memory> Interpreter<M> {
                 let dest = self.cpu.data[dn as usize];
                 let sm = ((source >> sh) & 1) == 1;
                 let dm = ((dest   >> sh) & 1) == 1;
-                let result = source.wrapping_add(dest);
+                let result = sz.masked(source.wrapping_add(dest));
                 let rm = ((result >> sh) & 1) == 1;
-                self.cpu.data[dn as usize] = match sz {
-                    Size::Byte => (dest & 0xffffff00) | (result & 0x000000ff),
-                    Size::Word => (dest & 0xffff0000) | (result & 0x0000ffff),
-                    Size::Long => result
-                };
+                let prev = self.cpu.data[dn as usize] & !sz.mask();
+                self.cpu.data[dn as usize] = prev | result;
+                let overflow = (sm && dm && !rm) || (!sm && !dm && rm);
+                let carry = (sm && dm) || (!rm && dm) || (sm && !rm);
+                self.set_flags(carry, rm, result == 0, overflow, carry);
+                true
+            },
+
+            ADD_to_EA(sz, dn, ea) => {
+                let sh = (sz.size() << 3) - 1;
+                let source = self.cpu.data[dn as usize];
+                let destat = ea.addr_of(sz, self);
+                let dest = self.mem.readsz(destat, sz);
+                let sm = ((source >> sh) & 1) == 1;
+                let dm = ((dest   >> sh) & 1) == 1;
+                let result = sz.masked(source.wrapping_add(dest));
+                let rm = ((result >> sh) & 1) == 1;
+                self.mem.writesz(destat, sz, result);
                 let overflow = (sm && dm && !rm) || (!sm && !dm && rm);
                 let carry = (sm && dm) || (!rm && dm) || (sm && !rm);
                 self.set_flags(carry, rm, result == 0, overflow, carry);
@@ -97,6 +129,39 @@ impl<M: Memory> Interpreter<M> {
                 self.cpu.pc = ea.addr_of(Size::Word, self);
                 false
             },
+
+            MOVE(sz, src, dst) => {
+                let result = sz.masked(src.value_of(sz, self));
+                dst.write(sz, self, result);
+                let sh = (sz.size() << 3) - 1;
+                let rm = ((result >> sh) & 1) == 1;
+                let x = self.cpu.cc_x();
+                self.set_flags(x, rm, result == 0, false, false);
+                true
+            },
+
+            MOVE_to_CCR(ea) => {
+                let data = ea.value_of(Size::Byte, self) as u16;
+                self.cpu.status &= 0xff00;
+                self.cpu.status |= data & 0x1f;
+                true
+            },
+
+            MOVE_to_SR(ea) => {
+                if self.cpu.supervisor() {
+                    self.cpu.status = ea.value_of(Size::Word, self) as u16;
+                    true
+                } else {
+                    self.trap(exec::EXC_PRIV);
+                    false
+                }
+            },
+
+            MOVEA(sz, ea, an) => {
+                let result = sz.masked(ea.value_of(sz, self));
+                self.cpu.addr[an as usize] = result;
+                true
+            }
 
             MOVEQ(x, dn) => {
                 self.cpu.data[dn as usize] = (x as i32) as u32;
@@ -118,6 +183,7 @@ impl<M: Memory> Interpreter<M> {
 
 trait Evaluable<M> {
     fn value_of(self, sz: Size, ee: &mut Interpreter<M>) -> u32;
+    fn write(self, sz: Size, ee: &mut Interpreter<M>, data: u32);
     fn addr_of(self, sz: Size, ee: &mut Interpreter<M>) -> u32;
 }
 
@@ -135,15 +201,30 @@ impl<M: Memory> Evaluable<M> for EA {
             ea => ea.addr_of(sz, ee)
         };
 
-        match sz {
-            Size::Byte => ee.mem.read8(addr) as u32,
-            Size::Word => ee.mem.read16(addr) as u32,
-            Size::Long => {
-                let lo = ee.mem.read16(addr) as u32;
-                let hi = ee.mem.read16(addr) as u32;
-                lo | (hi << 16)
+        ee.mem.readsz(addr, sz)
+    }
+
+    fn write(self, sz: Size, ee: &mut Interpreter<M>, data: u32) {
+        use instruction::EA::*;
+
+        let addr = match self {
+            DataDirect(dn) => {
+                let prev = ee.cpu.data[dn as usize] & !sz.mask();
+                ee.cpu.data[dn as usize] = prev | sz.masked(data);
+                return;
             },
-        }
+            AddrDirect(an) => {
+                ee.cpu.addr[an as usize] = data;
+                return;
+            },
+            ImmByte(_) => { return; },
+            ImmWord(_) => { return; },
+            ImmLong(_) => { return; },
+
+            ea => ea.addr_of(sz, ee)
+        };
+
+        ee.mem.writesz(addr, sz, data);
     }
 
     fn addr_of(self, sz: Size, ee: &mut Interpreter<M>) -> u32 {

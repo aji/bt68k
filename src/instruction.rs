@@ -31,6 +31,16 @@ impl Size {
             Size::Long => 4,
         }
     }
+
+    pub fn mask(self) -> u32 {
+        match self {
+            Size::Byte => 0x000000ff,
+            Size::Word => 0x0000ffff,
+            Size::Long => 0xffffffff,
+        }
+    }
+
+    pub fn masked(self, x: u32) -> u32 { x & self.mask() }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
