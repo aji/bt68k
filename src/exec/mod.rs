@@ -48,7 +48,7 @@ impl CPU {
             addr: [0; 8],
             ssp: 0,
             pc: 0,
-            status: 0,
+            status: SUPERVISOR_BIT,
         }
     }
 
