@@ -5,3 +5,5 @@ python3 \
   scripts/integration.txt \
   scripts/integration.rs \
   src/bin/test-integration.rs
+
+cargo build && target/debug/test-integration
