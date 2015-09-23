@@ -58,6 +58,18 @@
 --
 	%a1 == 0x00005678
 
+-- test: move to ccr
+	move	#0x7, %ccr
+1:	jmp	1b
+--
+	(%sr & 0xff) == 0x07
+
+-- test: move to sr
+	move	#0x7777, %sr
+1:	jmp	1b
+--
+	%sr == 0x7777
+
 -- test: addl (3 + 5)
 	moveq	#3, %d0
 	moveq	#5, %d1
