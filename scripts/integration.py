@@ -7,6 +7,8 @@ import tempfile
 DELIM_TEST   = '-- test: '
 DELIM_CHECK  = '--'
 
+DELIM_OUT    = '-- tests go here --'
+
 ARCH = 'm68k-unknown-elf-'
 
 class Test(object):
@@ -104,10 +106,22 @@ def scan_tests(lines):
             i += 1
 
 if __name__ == '__main__':
+    with open(sys.argv[2], 'r') as f:
+        before = ''
+        after = ''
+        for line in f:
+            if line.startswith(DELIM_OUT):
+                break
+            before += line
+        for line in f:
+            after += line
+
     with open(sys.argv[1], 'r') as f:
         lines = [x.rstrip() for x in f]
 
-    with open(sys.argv[2], 'w') as f:
+    with open(sys.argv[3], 'w') as f:
+        f.write(before)
         for t in scan_tests(lines):
             t.build()
             t.write(f)
+        f.write(after)
