@@ -59,6 +59,14 @@ impl CPU {
     pub fn cc_c(&self) -> bool { (self.status & C_BIT) != 0 }
 
     pub fn supervisor(&self) -> bool { (self.status & SUPERVISOR_BIT) != 0 }
+
+    pub fn sp(&mut self) -> &mut u32 {
+        if self.supervisor() {
+            &mut self.ssp
+        } else {
+            &mut self.addr[7]
+        }
+    }
 }
 
 impl fmt::Display for CPU {

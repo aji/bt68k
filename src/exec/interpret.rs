@@ -80,6 +80,30 @@ impl<M: Memory> Interpreter<M> {
         self.cpu.status |= exec::SUPERVISOR_BIT;
     }
 
+    fn push32(&mut self, data: u32) {
+        let sp = self.cpu.sp();
+        *sp = sp.wrapping_sub(4);
+        self.mem.write32(*sp, data);
+    }
+
+    fn pop32(&mut self) -> u32 {
+        let sp = self.cpu.sp();
+        *sp = sp.wrapping_add(4);
+        self.mem.read32(sp.wrapping_sub(4))
+    }
+
+    fn push16(&mut self, data: u16) {
+        let sp = self.cpu.sp();
+        *sp = sp.wrapping_sub(2);
+        self.mem.write16(*sp, data)
+    }
+
+    fn pop16(&mut self) -> u16 {
+        let sp = self.cpu.sp();
+        *sp = sp.wrapping_add(2);
+        self.mem.read16(sp.wrapping_sub(2))
+    }
+
     fn execute_once(&mut self) -> bool {
         self.icache_fetch();
 
@@ -91,6 +115,8 @@ impl<M: Memory> Interpreter<M> {
         if self.debug {
             println!("pc={:08x} {:?}", self.cpu.pc, inst);
         }
+
+        let pcnext = self.cpu.pc + ((len << 1) as u32);
 
         let res = match inst {
             ADD_to_Data(sz, ea, dn) => {
@@ -125,9 +151,77 @@ impl<M: Memory> Interpreter<M> {
                 true
             },
 
+            ADDA(sz, ea, an) => {
+                let source = ea.value_of(sz, self);
+                let dest = self.cpu.addr[an as usize];
+                let result = source.wrapping_add(dest);
+                self.cpu.addr[an as usize] = result;
+                true
+            },
+
+            ADDI(sz, source, ea) => {
+                let sh = (sz.size() << 3) - 1;
+                let dest = ea.value_of(sz, self);
+                let sm = ((source >> sh) & 1) == 1;
+                let dm = ((dest   >> sh) & 1) == 1;
+                let result = sz.masked(source.wrapping_add(dest));
+                let rm = ((result >> sh) & 1) == 1;
+                ea.write(sz, self, result);
+                let overflow = (sm && dm && !rm) || (!sm && !dm && rm);
+                let carry = (sm && dm) || (!rm && dm) || (sm && !rm);
+                self.set_flags(carry, rm, result == 0, overflow, carry);
+                true
+            },
+
+            ADDQ(sz, source8, ea) => {
+                let sh = (sz.size() << 3) - 1;
+                let source = source8 as u32;
+                let dest = ea.value_of(sz, self);
+                let sm = ((source >> sh) & 1) == 1;
+                let dm = ((dest   >> sh) & 1) == 1;
+                let result = sz.masked(source.wrapping_add(dest));
+                let rm = ((result >> sh) & 1) == 1;
+                ea.write(sz, self, result);
+                let overflow = (sm && dm && !rm) || (!sm && !dm && rm);
+                let carry = (sm && dm) || (!rm && dm) || (sm && !rm);
+                self.set_flags(carry, rm, result == 0, overflow, carry);
+                true
+            },
+
+            BRA(disp) => {
+                let offs = 2u32.wrapping_add((disp as i32) as u32);
+                self.cpu.pc = self.cpu.pc.wrapping_add(offs);
+                false
+            },
+
+            BSR(disp) => {
+                let offs = 2u32.wrapping_add((disp as i32) as u32);
+                self.push32(pcnext);
+                self.cpu.pc = self.cpu.pc.wrapping_add(offs);
+                false
+            },
+
+            CLR(sz, ea) => {
+                ea.write(sz, self, 0);
+                let x = self.cpu.cc_x();
+                self.set_flags(x, false, true, false, false);
+                true
+            },
+
             JMP(ea) => {
                 self.cpu.pc = ea.addr_of(Size::Word, self);
                 false
+            },
+
+            JSR(ea) => {
+                self.cpu.pc = ea.addr_of(Size::Word, self);
+                self.push32(pcnext);
+                false
+            },
+
+            LEA(ea, an) => {
+                self.cpu.addr[an as usize] = ea.addr_of(Size::Word, self);
+                true
             },
 
             MOVE(sz, src, dst) => {
@@ -168,10 +262,21 @@ impl<M: Memory> Interpreter<M> {
                 true
             },
 
+            PEA(ea) => {
+                let data = ea.addr_of(Size::Long, self);
+                self.push32(data);
+                true
+            },
+
+            RTS => {
+                self.cpu.pc = self.pop32();
+                false
+            },
+
             _ => false
         };
 
-        if res { self.cpu.pc += (len << 1) as u32; }
+        if res { self.cpu.pc = pcnext; }
 
         res
     }
@@ -233,24 +338,31 @@ impl<M: Memory> Evaluable<M> for EA {
         match self {
             AddrIndirect(an) => ee.cpu.addr[an as usize],
             AddrPostInc(an) => {
-                let width = match sz {
-                    Size::Byte => if an == 7 { 2 } else { 1 },
-                    Size::Word => 2,
-                    Size::Long => 4,
-                };
+                if an == 7 {
+                    let sp = ee.cpu.sp();
+                    let a = *sp;
+                    *sp = sp.wrapping_add(match sz {
+                        Size::Byte | Size::Word => 2,
+                        Size::Long => 4
+                    });
+                    return a;
+                }
                 let a = ee.cpu.addr[an as usize];
                 ee.cpu.addr[an as usize] =
-                    ee.cpu.addr[an as usize].wrapping_add(width as u32);
+                    ee.cpu.addr[an as usize].wrapping_add(sz.size() as u32);
                 a
             },
             AddrPreDec(an) => {
-                let width = match sz {
-                    Size::Byte => if an == 7 { 2 } else { 1 },
-                    Size::Word => 2,
-                    Size::Long => 4,
-                };
+                if an == 7 {
+                    let sp = ee.cpu.sp();
+                    *sp = sp.wrapping_add(match sz {
+                        Size::Byte | Size::Word => 2,
+                        Size::Long => 4
+                    });
+                    return *sp;
+                }
                 ee.cpu.addr[an as usize] =
-                    ee.cpu.addr[an as usize].wrapping_sub(width as u32);
+                    ee.cpu.addr[an as usize].wrapping_sub(sz.size() as u32);
                 ee.cpu.addr[an as usize]
             },
             AddrDisplace(an, disp) => {
