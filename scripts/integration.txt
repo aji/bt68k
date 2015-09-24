@@ -1,64 +1,88 @@
--- test: just moveq
-	moveq	#2, %d0
-	moveq	#60, %d1
-	moveq	#-1, %d2
+-- test: effective address data direct
+	moveq	#5, %d2
+	moveq	#3, %d0
+	add.l	%d0, %d2
 --
-	%d0 ==  2 &&
-	%d1 == 60 &&
-	%d2 == (-1i32 as u32)
+	%d2 == 8
 
--- test: just move
-	move.l	#0x1234, %d0
+-- test: effective address address direct
+	moveq	#5, %d2
+	movea	#3, %a0
+	add.l	%a0, %d2
 --
-	%d0 == 0x1234
+	%d2 == 8
 
--- test: just move, again
-	move.l	#0x12345678, %d0
-	move.l	%d0, %d1
+-- test: effective address postincrement byte
+	lea	(0x100), %a0
+	move.b	%d0, (%a0)+
 --
-	%d1 == 0x12345678
+	%a0 == 0x101
 
--- test: move.w affects lower word only
-	move.l	#0x12345678, %d0
-	move.l	#0xabcdefab, %d1
-	move.w	%d0, %d1
+-- test: effective address postincrement word
+	lea	(0x100), %a0
+	move.w	%d0, (%a0)+
 --
-	%d1 == 0xabcd5678
+	%a0 == 0x102
 
--- test: move.b affects lower byte only
-	move.l	#0x12345678, %d0
-	move.l	#0xabcdefab, %d1
-	move.b	%d0, %d1
+-- test: effective address postincrement long
+	lea	(0x100), %a0
+	move.l	%d0, (%a0)+
 --
-	%d1 == 0xabcdef78
+	%a0 == 0x104
 
--- test: just movea
-	movea.l	#0x12345678, %a0
+-- test: effective address predecrement byte
+	lea	(0x100), %a0
+	move.b	%d0, -(%a0)
 --
-	%a0 == 0x12345678
+	%a0 == 0xff
 
--- test: just movea, again
-	movea.l	#0x12345678, %a0
-	movea.l	%a0, %a1
+-- test: effective address predecrement word
+	lea	(0x100), %a0
+	move.w	%d0, -(%a0)
 --
-	%a1 == 0x12345678
+	%a0 == 0xfe
 
--- test: movea.w affects whole register
-	movea.l	#0x12345678, %a0
-	movea.l	#0xabcdefab, %a1
-	movea.w	%a0, %a1
+-- test: effective address predecrement long
+	lea	(0x100), %a0
+	move.l	%d0, -(%a0)
 --
-	%a1 == 0x00005678
+	%a0 == 0xfc
 
--- test: move to ccr
-	move	#0x7, %ccr
+-- test: stack pointer postincrement byte
+	lea	(0x100), %a7
+	move.b	%d0, (%a7)+
 --
-	(%sr & 0xff) == 0x07
+	%ssp == 0x102
 
--- test: move to sr
-	move	#0x7777, %sr
+-- test: stack pointer postincrement word
+	lea	(0x100), %a7
+	move.w	%d0, (%a7)+
 --
-	%sr == 0x7777
+	%ssp == 0x102
+
+-- test: stack pointer postincrement long
+	lea	(0x100), %a7
+	move.l	%d0, (%a7)+
+--
+	%ssp == 0x104
+
+-- test: stack pointer predecrement byte
+	lea	(0x100), %a7
+	move.b	%d0, -(%a7)
+--
+	%ssp == 0xfe
+
+-- test: stack pointer predecrement word
+	lea	(0x100), %a7
+	move.w	%d0, -(%a7)
+--
+	%ssp == 0xfe
+
+-- test: stack pointer predecrement long
+	lea	(0x100), %a7
+	move.l	%d0, -(%a7)
+--
+	%ssp == 0xfc
 
 -- test: add.l (3 + 5)
 	moveq	#3, %d0
@@ -160,3 +184,65 @@
 	lea.l	-2(%pc), %a0
 --
 	%a0 == 0
+
+-- test: just moveq
+	moveq	#2, %d0
+	moveq	#60, %d1
+	moveq	#-1, %d2
+--
+	%d0 ==  2 &&
+	%d1 == 60 &&
+	%d2 == (-1i32 as u32)
+
+-- test: just move
+	move.l	#0x1234, %d0
+--
+	%d0 == 0x1234
+
+-- test: just move, again
+	move.l	#0x12345678, %d0
+	move.l	%d0, %d1
+--
+	%d1 == 0x12345678
+
+-- test: move.w affects lower word only
+	move.l	#0x12345678, %d0
+	move.l	#0xabcdefab, %d1
+	move.w	%d0, %d1
+--
+	%d1 == 0xabcd5678
+
+-- test: move.b affects lower byte only
+	move.l	#0x12345678, %d0
+	move.l	#0xabcdefab, %d1
+	move.b	%d0, %d1
+--
+	%d1 == 0xabcdef78
+
+-- test: just movea
+	movea.l	#0x12345678, %a0
+--
+	%a0 == 0x12345678
+
+-- test: just movea, again
+	movea.l	#0x12345678, %a0
+	movea.l	%a0, %a1
+--
+	%a1 == 0x12345678
+
+-- test: movea.w affects whole register
+	movea.l	#0x12345678, %a0
+	movea.l	#0xabcdefab, %a1
+	movea.w	%a0, %a1
+--
+	%a1 == 0x00005678
+
+-- test: move to ccr
+	move	#0x7, %ccr
+--
+	(%sr & 0xff) == 0x07
+
+-- test: move to sr
+	move	#0x7777, %sr
+--
+	%sr == 0x7777

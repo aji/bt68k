@@ -220,7 +220,8 @@ impl<M: Memory> Interpreter<M> {
             },
 
             LEA(ea, an) => {
-                self.cpu.addr[an as usize] = ea.addr_of(Size::Word, self);
+                let data = ea.addr_of(Size::Word, self);
+                EA::AddrDirect(an).write(Size::Word, self, data);
                 true
             },
 
@@ -253,7 +254,7 @@ impl<M: Memory> Interpreter<M> {
 
             MOVEA(sz, ea, an) => {
                 let result = sz.masked(ea.value_of(sz, self));
-                self.cpu.addr[an as usize] = result;
+                EA::AddrDirect(an).write(Size::Word, self, result);
                 true
             }
 
@@ -298,7 +299,13 @@ impl<M: Memory> Evaluable<M> for EA {
 
         let addr = match self {
             DataDirect(dn) => return ee.cpu.data[dn as usize],
-            AddrDirect(an) => return ee.cpu.addr[an as usize],
+            AddrDirect(an) => return {
+                if an == 7 && ee.cpu.supervisor() {
+                    ee.cpu.ssp
+                } else {
+                    ee.cpu.addr[an as usize]
+                }
+            },
             ImmByte(x) => return x as u32,
             ImmWord(x) => return x as u32,
             ImmLong(x) => return x,
@@ -319,7 +326,11 @@ impl<M: Memory> Evaluable<M> for EA {
                 return;
             },
             AddrDirect(an) => {
-                ee.cpu.addr[an as usize] = data;
+                if an == 7 && ee.cpu.supervisor() {
+                    ee.cpu.ssp = data;
+                } else {
+                    ee.cpu.addr[an as usize] = data;
+                }
                 return;
             },
             ImmByte(_) => { return; },
@@ -336,7 +347,13 @@ impl<M: Memory> Evaluable<M> for EA {
         use instruction::EA::*;
 
         match self {
-            AddrIndirect(an) => ee.cpu.addr[an as usize],
+            AddrIndirect(an) => {
+                if an == 7 && ee.cpu.supervisor() {
+                    ee.cpu.ssp
+                } else {
+                    ee.cpu.addr[an as usize]
+                }
+            },
             AddrPostInc(an) => {
                 if an == 7 {
                     let sp = ee.cpu.sp();
@@ -355,7 +372,7 @@ impl<M: Memory> Evaluable<M> for EA {
             AddrPreDec(an) => {
                 if an == 7 {
                     let sp = ee.cpu.sp();
-                    *sp = sp.wrapping_add(match sz {
+                    *sp = sp.wrapping_sub(match sz {
                         Size::Byte | Size::Word => 2,
                         Size::Long => 4
                     });
