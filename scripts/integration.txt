@@ -67,6 +67,62 @@
 --
 	%d0 == 8
 
+-- test: jmp address indirect
+	lea.l	(0x1000), %a6
+	jmp	(%a6)
+--
+	%pc == 0x1000
+
+-- test: jmp address positive displacement
+	lea.l	(0x1000), %a6
+	jmp	2(%a6)
+--
+	%pc == 0x1002
+
+-- test: jmp address negative displacement
+	lea.l	(0x1002), %a6
+	jmp	-2(%a6)
+--
+	%pc == 0x1000
+
+-- test: jmp address indexed
+	lea.l	(0x1000), %a6
+	moveq	#4, %d3
+	jmp	2(%a6, %d3)
+--
+	%pc == 0x1006
+
+-- test: jmp absolute word
+	jmp	(0x1000).w
+--
+	%pc == 0x1000
+
+-- test: jmp absolute long
+	jmp	(0x1000)
+--
+	%pc == 0x1000
+
+-- test: jmp program counter zero displacement
+	jmp	0(%pc)
+--
+	%pc == 2
+
+-- test: jmp program counter positive displacement
+	jmp	2(%pc)
+--
+	%pc == 4
+
+-- test: jmp program counter negative displacement
+	jmp	-2(%pc)
+--
+	%pc == 0
+
+-- test: jmp program counter indexed
+	moveq	#4, %d3
+	jmp	2(%pc, %d3)
+--
+	%pc == 10
+
 -- test: lea.l immediate
 	lea.l	(0x123456), %a4
 --
