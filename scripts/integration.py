@@ -26,6 +26,7 @@ class Test(object):
             else:
                 asm.append(lines[i])
                 i += 1
+        asm.append('1:\tjmp\t1b')
 
         self.name   = self.name if self.name else '(unnamed)'
         self.asm    = '\n'.join(asm) + '\n'
