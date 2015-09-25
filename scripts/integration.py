@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
-import sys, os
+import os
+import re
+import sys
 import subprocess
 import tempfile
 
@@ -82,6 +84,9 @@ class Test(object):
         r = r.replace('%ssp', '(ee.cpu().ssp)')
         r = r.replace('%pc',  '(ee.cpu().pc)')
         r = r.replace('%sr',  '(ee.cpu().status)')
+        r = re.sub('mem8<([^>]*)>',  '(ee.mem().read8({\\1}))', r)
+        r = re.sub('mem16<([^>]*)>', '(ee.mem().read16({\\1}))', r)
+        r = re.sub('mem32<([^>]*)>', '(ee.mem().read32({\\1}))', r)
         self.rust = r
 
     def write(self, f):

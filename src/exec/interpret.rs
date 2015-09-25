@@ -37,6 +37,10 @@ impl<M> Interpreter<M> {
     pub fn cpu(&self) -> &CPU { &self.cpu }
 
     pub fn cpu_mut(&mut self) -> &mut CPU { &mut self.cpu }
+
+    pub fn mem(&self) -> &M { &self.mem }
+
+    pub fn mem_mut(&mut self) -> &mut M { &mut self.mem }
 }
 
 impl<M: Memory> Interpreter<M> {

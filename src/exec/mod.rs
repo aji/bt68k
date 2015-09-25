@@ -139,12 +139,12 @@ pub trait Memory {
     }
 
     fn read32(&self, addr: u32) -> u32 {
-        ((self.read16(addr) as u32) << 16) | (self.read16(addr+1) as u32)
+        ((self.read16(addr) as u32) << 16) | (self.read16(addr+2) as u32)
     }
 
     fn write32(&mut self, addr: u32, data: u32) {
         self.write16(addr, (data >> 16) as u16);
-        self.write16(addr+1, data as u16);
+        self.write16(addr+2, data as u16);
     }
 
     fn readsz(&self, addr: u32, sz: Size) -> u32 {

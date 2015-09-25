@@ -13,76 +13,100 @@
 	%d2 == 8
 
 -- test: effective address postincrement byte
-	lea	(0x100), %a0
+	lea	(0xf010), %a0
+	moveq	#122, %d0
 	move.b	%d0, (%a0)+
 --
-	%a0 == 0x101
+	%a0 == 0xf011 &&
+	mem8<0xf010> == 122
 
 -- test: effective address postincrement word
-	lea	(0x100), %a0
+	lea	(0xf010), %a0
+	moveq	#122, %d0
 	move.w	%d0, (%a0)+
 --
-	%a0 == 0x102
+	%a0 == 0xf012 &&
+	mem16<0xf010> == 122
 
 -- test: effective address postincrement long
-	lea	(0x100), %a0
+	lea	(0xf010), %a0
+	moveq	#122, %d0
 	move.l	%d0, (%a0)+
 --
-	%a0 == 0x104
+	%a0 == 0xf014 &&
+	mem32<0xf010> == 122
 
 -- test: effective address predecrement byte
-	lea	(0x100), %a0
+	lea	(0xf010), %a0
+	moveq	#122, %d0
 	move.b	%d0, -(%a0)
 --
-	%a0 == 0xff
+	%a0 == 0xf00f &&
+	mem8<0xf00f> == 122
 
 -- test: effective address predecrement word
-	lea	(0x100), %a0
+	lea	(0xf010), %a0
+	moveq	#122, %d0
 	move.w	%d0, -(%a0)
 --
-	%a0 == 0xfe
+	%a0 == 0xf00e &&
+	mem16<0xf00e> == 122
 
 -- test: effective address predecrement long
-	lea	(0x100), %a0
+	lea	(0xf010), %a0
+	moveq	#122, %d0
 	move.l	%d0, -(%a0)
 --
-	%a0 == 0xfc
+	%a0 == 0xf00c &&
+	mem32<0xf00c> == 122
 
 -- test: stack pointer postincrement byte
-	lea	(0x100), %a7
+	lea	(0xf010), %a7
+	moveq	#122, %d0
 	move.b	%d0, (%a7)+
 --
-	%ssp == 0x102
+	%ssp == 0xf012 &&
+	mem8<0xf010> == 122
 
 -- test: stack pointer postincrement word
-	lea	(0x100), %a7
+	lea	(0xf010), %a7
+	moveq	#122, %d0
 	move.w	%d0, (%a7)+
 --
-	%ssp == 0x102
+	%ssp == 0xf012 &&
+	mem16<0xf010> == 122
 
 -- test: stack pointer postincrement long
-	lea	(0x100), %a7
+	lea	(0xf010), %a7
+	moveq	#122, %d0
 	move.l	%d0, (%a7)+
 --
-	%ssp == 0x104
+	%ssp == 0xf014 &&
+	mem32<0xf010> == 122
 
 -- test: stack pointer predecrement byte
-	lea	(0x100), %a7
+	lea	(0xf010), %a7
+	moveq	#122, %d0
 	move.b	%d0, -(%a7)
 --
-	%ssp == 0xfe
+	%ssp == 0xf00e &&
+	mem8<0xf00e> == 122
 
 -- test: stack pointer predecrement word
-	lea	(0x100), %a7
+	lea	(0xf010), %a7
+	moveq	#122, %d0
 	move.w	%d0, -(%a7)
 --
-	%ssp == 0xfe
+	%ssp == 0xf00e &&
+	mem16<0xf00e> == 122
 
 -- test: stack pointer predecrement long
-	lea	(0x100), %a7
+	lea	(0xf010), %a7
+	moveq	#122, %d0
 	move.l	%d0, -(%a7)
 --
-	%ssp == 0xfc
+	%ssp == 0xf00c &&
+	mem32<0xf00c> == 122
 
 -- test: add.l (3 + 5)
 	moveq	#3, %d0
