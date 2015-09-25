@@ -41,6 +41,39 @@ impl<M> Interpreter<M> {
     pub fn mem(&self) -> &M { &self.mem }
 
     pub fn mem_mut(&mut self) -> &mut M { &mut self.mem }
+
+    fn set_flags(&mut self, x: bool, n: bool, z: bool, v: bool, c: bool) {
+        let bits =
+            (if x { 0b10000 } else { 0 }) |
+            (if n { 0b01000 } else { 0 }) |
+            (if z { 0b00100 } else { 0 }) |
+            (if v { 0b00010 } else { 0 }) |
+            (if c { 0b00001 } else { 0 });
+        self.cpu.status = (self.cpu.status & 0xff00) | bits;
+    }
+
+    #[allow(non_snake_case)]
+    pub fn flags_add(&mut self, sz: Size, inS: u32, inD: u32, inR: u32) {
+        let sh = sz.size() << 3;
+        let mask = {
+            ((inS >> sh - 3) & 0b100) |
+            ((inD >> sh - 2) & 0b010) |
+            ((inR >> sh - 1) & 0b001)
+        };
+        let (N, V, C) = match mask {
+            // Sm Dm Rm
+            0b__0__0__0 => (false, false, false),
+            0b__0__0__1 => (false,  true,  true),
+            0b__0__1__0 => ( true, false, false),
+            0b__0__1__1 => (false, false,  true),
+            0b__1__0__0 => ( true, false, false),
+            0b__1__0__1 => (false, false,  true),
+            0b__1__1__0 => ( true,  true, false),
+            0b__1__1__1 => ( true, false,  true),
+                      _ => (false, false, false),
+        };
+        self.set_flags(C, N, inR == 0, V, C);
+    }
 }
 
 impl<M: Memory> Interpreter<M> {
@@ -54,16 +87,6 @@ impl<M: Memory> Interpreter<M> {
         self.icache.push(self.mem.read16(self.icache_base +  6));
         self.icache.push(self.mem.read16(self.icache_base +  8));
         self.icache.push(self.mem.read16(self.icache_base + 10));
-    }
-
-    fn set_flags(&mut self, x: bool, n: bool, z: bool, v: bool, c: bool) {
-        let bits =
-            (if x { 0b10000 } else { 0 }) |
-            (if n { 0b01000 } else { 0 }) |
-            (if z { 0b00100 } else { 0 }) |
-            (if v { 0b00010 } else { 0 }) |
-            (if c { 0b00001 } else { 0 });
-        self.cpu.status = (self.cpu.status & 0xff00) | bits;
     }
 
     pub fn reset(&mut self) {
@@ -124,34 +147,21 @@ impl<M: Memory> Interpreter<M> {
 
         let res = match inst {
             ADD_to_Data(sz, ea, dn) => {
-                let sh = (sz.size() << 3) - 1;
                 let source = ea.value_of(sz, self);
                 let dest = self.cpu.data[dn as usize];
-                let sm = ((source >> sh) & 1) == 1;
-                let dm = ((dest   >> sh) & 1) == 1;
                 let result = sz.masked(source.wrapping_add(dest));
-                let rm = ((result >> sh) & 1) == 1;
                 let prev = self.cpu.data[dn as usize] & !sz.mask();
                 self.cpu.data[dn as usize] = prev | result;
-                let overflow = (sm && dm && !rm) || (!sm && !dm && rm);
-                let carry = (sm && dm) || (!rm && dm) || (sm && !rm);
-                self.set_flags(carry, rm, result == 0, overflow, carry);
+                self.flags_add(sz, source, dest, result);
                 true
             },
 
             ADD_to_EA(sz, dn, ea) => {
-                let sh = (sz.size() << 3) - 1;
                 let source = self.cpu.data[dn as usize];
-                let destat = ea.addr_of(sz, self);
-                let dest = self.mem.readsz(destat, sz);
-                let sm = ((source >> sh) & 1) == 1;
-                let dm = ((dest   >> sh) & 1) == 1;
+                let dest = ea.value_of(sz, self);
                 let result = sz.masked(source.wrapping_add(dest));
-                let rm = ((result >> sh) & 1) == 1;
-                self.mem.writesz(destat, sz, result);
-                let overflow = (sm && dm && !rm) || (!sm && !dm && rm);
-                let carry = (sm && dm) || (!rm && dm) || (sm && !rm);
-                self.set_flags(carry, rm, result == 0, overflow, carry);
+                ea.write(sz, self, result);
+                self.flags_add(sz, source, dest, result);
                 true
             },
 
