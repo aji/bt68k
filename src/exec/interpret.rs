@@ -42,14 +42,23 @@ impl<M> Interpreter<M> {
 
     pub fn mem_mut(&mut self) -> &mut M { &mut self.mem }
 
-    fn set_flags(&mut self, x: bool, n: bool, z: bool, v: bool, c: bool) {
+    fn set_flags_x(&mut self, x: bool, n: bool, z: bool, v: bool, c: bool) {
         let bits =
             (if x { 0b10000 } else { 0 }) |
             (if n { 0b01000 } else { 0 }) |
             (if z { 0b00100 } else { 0 }) |
             (if v { 0b00010 } else { 0 }) |
             (if c { 0b00001 } else { 0 });
-        self.cpu.status = (self.cpu.status & 0xff00) | bits;
+        self.cpu.status = (self.cpu.status & 0xffe0) | bits;
+    }
+
+    fn set_flags(&mut self, n: bool, z: bool, v: bool, c: bool) {
+        let bits =
+            (if n { 0b01000 } else { 0 }) |
+            (if z { 0b00100 } else { 0 }) |
+            (if v { 0b00010 } else { 0 }) |
+            (if c { 0b00001 } else { 0 });
+        self.cpu.status = (self.cpu.status & 0xfff0) | bits;
     }
 
     #[allow(non_snake_case)]
@@ -62,17 +71,23 @@ impl<M> Interpreter<M> {
         };
         let (N, V, C) = match mask {
             // Sm Dm Rm
-            0b__0__0__0 => (false, false, false),
-            0b__0__0__1 => (false,  true,  true),
-            0b__0__1__0 => ( true, false, false),
-            0b__0__1__1 => (false, false,  true),
-            0b__1__0__0 => ( true, false, false),
-            0b__1__0__1 => (false, false,  true),
-            0b__1__1__0 => ( true,  true, false),
-            0b__1__1__1 => ( true, false,  true),
-                      _ => (false, false, false),
+            0b__0__0__0 => (false, false, false,),
+            0b__0__0__1 => ( true,  true, false,),
+            0b__0__1__0 => (false, false,  true,),
+            0b__0__1__1 => ( true, false, false,),
+            0b__1__0__0 => (false, false,  true,),
+            0b__1__0__1 => ( true, false, false,),
+            0b__1__1__0 => (false,  true,  true,),
+            0b__1__1__1 => ( true, false,  true,),
+                      _ => (false, false, false,),
         };
-        self.set_flags(C, N, inR == 0, V, C);
+        self.set_flags_x(C, N, inR == 0, V, C);
+    }
+
+    #[allow(non_snake_case)]
+    pub fn flags_logic(&mut self, sz: Size, inR: u32) {
+        let sh = sz.size() << 3;
+        self.set_flags(((inR >> sh) & 1) != 0, inR == 0, false, false);
     }
 }
 
@@ -174,31 +189,19 @@ impl<M: Memory> Interpreter<M> {
             },
 
             ADDI(sz, source, ea) => {
-                let sh = (sz.size() << 3) - 1;
                 let dest = ea.value_of(sz, self);
-                let sm = ((source >> sh) & 1) == 1;
-                let dm = ((dest   >> sh) & 1) == 1;
                 let result = sz.masked(source.wrapping_add(dest));
-                let rm = ((result >> sh) & 1) == 1;
                 ea.write(sz, self, result);
-                let overflow = (sm && dm && !rm) || (!sm && !dm && rm);
-                let carry = (sm && dm) || (!rm && dm) || (sm && !rm);
-                self.set_flags(carry, rm, result == 0, overflow, carry);
+                self.flags_add(sz, source, dest, result);
                 true
             },
 
             ADDQ(sz, source8, ea) => {
-                let sh = (sz.size() << 3) - 1;
                 let source = source8 as u32;
                 let dest = ea.value_of(sz, self);
-                let sm = ((source >> sh) & 1) == 1;
-                let dm = ((dest   >> sh) & 1) == 1;
                 let result = sz.masked(source.wrapping_add(dest));
-                let rm = ((result >> sh) & 1) == 1;
                 ea.write(sz, self, result);
-                let overflow = (sm && dm && !rm) || (!sm && !dm && rm);
-                let carry = (sm && dm) || (!rm && dm) || (sm && !rm);
-                self.set_flags(carry, rm, result == 0, overflow, carry);
+                self.flags_add(sz, source, dest, result);
                 true
             },
 
@@ -217,8 +220,7 @@ impl<M: Memory> Interpreter<M> {
 
             CLR(sz, ea) => {
                 ea.write(sz, self, 0);
-                let x = self.cpu.cc_x();
-                self.set_flags(x, false, true, false, false);
+                self.set_flags(false, true, false, false);
                 true
             },
 
@@ -244,8 +246,7 @@ impl<M: Memory> Interpreter<M> {
                 dst.write(sz, self, result);
                 let sh = (sz.size() << 3) - 1;
                 let rm = ((result >> sh) & 1) == 1;
-                let x = self.cpu.cc_x();
-                self.set_flags(x, rm, result == 0, false, false);
+                self.set_flags(rm, result == 0, false, false);
                 true
             },
 
