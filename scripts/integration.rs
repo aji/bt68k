@@ -1,4 +1,5 @@
 extern crate bt68k;
+extern crate time;
 
 use bt68k::exec::*;
 use bt68k::exec::interpret::*;
@@ -29,7 +30,23 @@ impl<'a> Memory for TestMemory {
     }
 }
 
-fn run_test<F>(name: &'static str, code: &[u16], verify: F)
+struct Timer {
+    total: time::Duration
+}
+
+impl Timer {
+    fn new() -> Timer {
+        Timer { total: time::Duration::zero() }
+    }
+
+    fn timed<F: FnMut()>(&mut self, mut target: F) {
+        let start = time::now();
+        target();
+        self.total = self.total + (time::now() - start);
+    }
+}
+
+fn run_test<F>(timer: &mut Timer, name: &'static str, code: &[u16], verify: F)
 where F: Fn(&Interpreter<TestMemory>) -> bool {
     println!("Testing {}...", name);
 
@@ -40,7 +57,7 @@ where F: Fn(&Interpreter<TestMemory>) -> bool {
 
     let ok = {
         let mut ee = Interpreter::new(CPU::new(), mem.clone(), false);
-        ee.execute();
+        timer.timed(|| ee.execute());
         verify(&ee)
     };
 
@@ -54,11 +71,16 @@ where F: Fn(&Interpreter<TestMemory>) -> bool {
 }
 
 macro_rules! test {
-    ($name:expr, $prog:expr, $func:expr) => (
-        run_test($name, &$prog[..], $func)
+    ($timer:expr, $name:expr, $prog:expr, $func:expr) => (
+        run_test($timer, $name, &$prog[..], $func)
     )
 }
 
 pub fn main() {
+    let mut timer = Timer::new();
 -- tests go here --
+    match timer.total.num_microseconds() {
+        Some(us) => println!("Finished in {} us", us),
+        None     => println!("Finished in {} ms", timer.total.num_milliseconds()),
+    }
 }

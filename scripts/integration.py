@@ -32,9 +32,11 @@ class Test(object):
 
         self.name   = self.name if self.name else '(unnamed)'
         self.asm    = '\n'.join(asm) + '\n'
-        self.check  = '\n'.join(lines[i+1:]) + '\n'
+        self.check  = '\n'.join(lines[i+1:])
         self.code   = None
         self.rust   = None
+
+        self.insts  = len(asm)
 
     def build(self):
         #
@@ -98,7 +100,8 @@ class Test(object):
         name = '"{}"'.format(self.name.replace('"', '\\"'))
         words = [((a<<8)|b) for a,b in zip(self.code[0::2], self.code[1::2])]
         code = '[{}]'.format(','.join('0x{:04x}'.format(w) for w in words))
-        test = 'test!({},{},|ee|{{\n{}}});\n'.format(name, code, self.rust)
+        test = 'test!(&mut timer,{},{},|ee|{{{}}});\n'.format(
+            name, code, self.rust)
         f.write(test)
 
 def scan_tests(lines):
@@ -130,9 +133,12 @@ if __name__ == '__main__':
     with open(sys.argv[1], 'r') as f:
         lines = [x.rstrip() for x in f]
 
+    total_insts = 0
     with open(sys.argv[3], 'w') as f:
         f.write(before)
         for t in scan_tests(lines):
+            total_insts += t.insts
             t.build()
             t.write(f)
+        f.write('println!("Totaling {} instructions");'.format(total_insts))
         f.write(after)
