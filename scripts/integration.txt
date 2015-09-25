@@ -12,6 +12,24 @@
 --
 	%d2 == 8
 
+-- test: effective address address indirect byte
+	lea	(0xff00), %a0
+	move.b	#122, (%a0)
+--
+	mem8<0xff00> == 122
+
+-- test: effective address address indirect word
+	lea	(0xff00), %a0
+	move.w	#122, (%a0)
+--
+	mem16<0xff00> == 122
+
+-- test: effective address address indirect long
+	lea	(0xff00), %a0
+	move.l	#122, (%a0)
+--
+	mem32<0xff00> == 122
+
 -- test: effective address postincrement byte
 	lea	(0xf010), %a0
 	moveq	#122, %d0
@@ -107,6 +125,57 @@
 --
 	%ssp == 0xf00c &&
 	mem32<0xf00c> == 122
+
+-- test: effective address address positive displacement
+	lea	(0xf010), %a0
+	lea	2(%a0), %a1
+--
+	%a1 == 0xf012
+
+-- test: effective address address negative displacement
+	lea	(0xf010), %a0
+	lea	-2(%a0), %a1
+--
+	%a1 == 0xf00e
+
+-- test: effective address address positive index positive displacement
+	lea	(0xf010), %a0
+	moveq	#2, %d0
+	lea	2(%a0, %d0), %a1
+--
+	%a1 == 0xf014
+
+-- test: effective address address positive index negative displacement
+	lea	(0xf010), %a0
+	moveq	#2, %d0
+	lea	-2(%a0, %d0), %a1
+--
+	%a1 == 0xf010
+
+-- test: effective address address negative index positive displacement
+	lea	(0xf010), %a0
+	moveq	#-2, %d0
+	lea	2(%a0, %d0), %a1
+--
+	%a1 == 0xf010
+
+-- test: effective address address negative index negative displacement
+	lea	(0xf010), %a0
+	moveq	#-2, %d0
+	lea	-2(%a0, %d0), %a1
+--
+	%a1 == 0xf00c
+
+-- test: effective address program counter displacement
+	lea	2(%pc), %a0
+--
+	%a0 == 4
+
+-- test: effective address program counter indexed
+	moveq	#2, %d0
+	lea	2(%pc, %d0), %a0
+--
+	%a0 == 8
 
 -- test: add.l (3 + 5)
 	moveq	#3, %d0
