@@ -267,6 +267,8 @@ impl<M: Memory> Interpreter<M> {
                 true
             },
 
+            NOP => true,
+
             PEA(ea) => {
                 let data = ea.addr_of(Size::Long, self);
                 self.push32(data);
