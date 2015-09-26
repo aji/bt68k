@@ -12,7 +12,7 @@ struct TestMemory {
 
 impl<'a> Memory for TestMemory {
     fn ref16(&self, addr: u32) -> Option<&u16> {
-        if addr > 0xf000 {
+        if addr >= 0xf000 {
             Some(&self.ram[((addr - 0xf000) >> 1) as usize])
         } else if (addr as usize) < self.rom.len() << 1 {
             Some(&self.rom[(addr >> 1) as usize])
@@ -22,7 +22,7 @@ impl<'a> Memory for TestMemory {
     }
 
     fn ref16_mut(&mut self, addr: u32) -> Option<&mut u16> {
-        if addr > 0xf000 {
+        if addr >= 0xf000 {
             Some(&mut self.ram[((addr - 0xf000) >> 1) as usize])
         } else {
             None

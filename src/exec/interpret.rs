@@ -52,6 +52,11 @@ impl<M> Interpreter<M> {
         self.cpu.status = (self.cpu.status & 0xffe0) | bits;
     }
 
+    fn set_flag_z(&mut self, z: bool) {
+        let bits = if z { 0b00100 } else { 0 };
+        self.cpu.status = (self.cpu.status & 0xfffb) | bits;
+    }
+
     fn set_flags(&mut self, n: bool, z: bool, v: bool, c: bool) {
         let bits =
             (if n { 0b01000 } else { 0 }) |
@@ -257,10 +262,126 @@ impl<M: Memory> Interpreter<M> {
                 true
             },
 
+            BCHG_Data(dn, ea) => {
+                if let EA::DataDirect(dx) = ea {
+                    let dest = self.cpu.data[dx as usize];
+                    let bit = 1 << (self.cpu.data[dn as usize] & 0x1f);
+                    self.cpu.data[dx as usize] = dest ^ bit;
+                    self.set_flag_z((dest & bit) == 0);
+                } else {
+                    let dest = ea.value_of(Size::Byte, self);
+                    let bit = 1 << (self.cpu.data[dn as usize] & 0x7);
+                    ea.write(Size::Byte, self, dest ^ bit);
+                    self.set_flag_z((dest & bit) == 0);
+                }
+                true
+            },
+
+            BCHG_Imm(bitnr, ea) => {
+                if let EA::DataDirect(dx) = ea {
+                    let dest = self.cpu.data[dx as usize];
+                    let bit = 1 << ((bitnr as u32) & 0x1f);
+                    self.cpu.data[dx as usize] = dest ^ bit;
+                    self.set_flag_z((dest & bit) == 0);
+                } else {
+                    let dest = ea.value_of(Size::Byte, self);
+                    let bit = 1 << ((bitnr as u32) & 0x7);
+                    ea.write(Size::Byte, self, dest ^ bit);
+                    self.set_flag_z((dest & bit) == 0);
+                }
+                true
+            },
+
+            BCLR_Data(dn, ea) => {
+                if let EA::DataDirect(dx) = ea {
+                    let dest = self.cpu.data[dx as usize];
+                    let bit = 1 << (self.cpu.data[dn as usize] & 0x1f);
+                    self.cpu.data[dx as usize] = dest & !bit;
+                    self.set_flag_z((dest & bit) == 0);
+                } else {
+                    let dest = ea.value_of(Size::Byte, self);
+                    let bit = 1 << (self.cpu.data[dn as usize] & 0x7);
+                    ea.write(Size::Byte, self, dest & !bit);
+                    self.set_flag_z((dest & bit) == 0);
+                }
+                true
+            },
+
+            BCLR_Imm(bitnr, ea) => {
+                if let EA::DataDirect(dx) = ea {
+                    let dest = self.cpu.data[dx as usize];
+                    let bit = 1 << ((bitnr as u32) & 0x1f);
+                    self.cpu.data[dx as usize] = dest & !bit;
+                    self.set_flag_z((dest & bit) == 0);
+                } else {
+                    let dest = ea.value_of(Size::Byte, self);
+                    let bit = 1 << ((bitnr as u32) & 0x7);
+                    ea.write(Size::Byte, self, dest & !bit);
+                    self.set_flag_z((dest & bit) == 0);
+                }
+                true
+            },
+
             BRA(disp) => {
                 let offs = 2u32.wrapping_add((disp as i32) as u32);
                 self.cpu.pc = self.cpu.pc.wrapping_add(offs);
                 false
+            },
+
+            BSET_Data(dn, ea) => {
+                if let EA::DataDirect(dx) = ea {
+                    let dest = self.cpu.data[dx as usize];
+                    let bit = 1 << (self.cpu.data[dn as usize] & 0x1f);
+                    self.cpu.data[dx as usize] = dest | bit;
+                    self.set_flag_z((dest & bit) == 0);
+                } else {
+                    let dest = ea.value_of(Size::Byte, self);
+                    let bit = 1 << (self.cpu.data[dn as usize] & 0x7);
+                    ea.write(Size::Byte, self, dest | bit);
+                    self.set_flag_z((dest & bit) == 0);
+                }
+                true
+            },
+
+            BSET_Imm(bitnr, ea) => {
+                if let EA::DataDirect(dx) = ea {
+                    let dest = self.cpu.data[dx as usize];
+                    let bit = 1 << ((bitnr as u32) & 0x1f);
+                    self.cpu.data[dx as usize] = dest | bit;
+                    self.set_flag_z((dest & bit) == 0);
+                } else {
+                    let dest = ea.value_of(Size::Byte, self);
+                    let bit = 1 << ((bitnr as u32) & 0x7);
+                    ea.write(Size::Byte, self, dest | bit);
+                    self.set_flag_z((dest & bit) == 0);
+                }
+                true
+            },
+
+            BTST_Data(dn, ea) => {
+                if let EA::DataDirect(dx) = ea {
+                    let dest = self.cpu.data[dx as usize];
+                    let bit = 1 << (self.cpu.data[dn as usize] & 0x1f);
+                    self.set_flag_z((dest & bit) == 0);
+                } else {
+                    let dest = ea.value_of(Size::Byte, self);
+                    let bit = 1 << (self.cpu.data[dn as usize] & 0x7);
+                    self.set_flag_z((dest & bit) == 0);
+                }
+                true
+            },
+
+            BTST_Imm(bitnr, ea) => {
+                if let EA::DataDirect(dx) = ea {
+                    let dest = self.cpu.data[dx as usize];
+                    let bit = 1 << ((bitnr as u32) & 0x1f);
+                    self.set_flag_z((dest & bit) == 0);
+                } else {
+                    let dest = ea.value_of(Size::Byte, self);
+                    let bit = 1 << ((bitnr as u32) & 0x7);
+                    self.set_flag_z((dest & bit) == 0);
+                }
+                true
             },
 
             BSR(disp) => {
