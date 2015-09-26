@@ -241,6 +241,104 @@
 --
 	%d0 == 8
 
+-- test: bcc high
+2:	move.l	#0xc0000000, %d0
+	cmp.l	#0xb0000000, %d0
+	bhi	2b
+--
+	%pc == 0
+
+-- test: bcc low or same 1
+2:	move.l	#0xb0000000, %d0
+	cmp.l	#0xc0000000, %d0
+	bls	2b
+--
+	%pc == 0
+
+-- test: bcc low or same 2
+2:	move.l	#0xb0000000, %d0
+	cmp.l	#0xb0000000, %d0
+	bls	2b
+--
+	%pc == 0
+
+-- test: bcc high or same 1
+2:	move.l	#0xc0000000, %d0
+	cmp.l	#0xb0000000, %d0
+	bhs	2b
+--
+	%pc == 0
+
+-- test: bcc high or same 2
+2:	move.l	#0xb0000000, %d0
+	cmp.l	#0xb0000000, %d0
+	bhs	2b
+--
+	%pc == 0
+
+-- test: bcc low
+2:	move.l	#0xb0000000, %d0
+	cmp.l	#0xc0000000, %d0
+	blo	2b
+--
+	%pc == 0
+
+-- test: bcc not equal 1
+2:	move.l	#0xb0000000, %d0
+	cmp.l	#0xc0000000, %d0
+	bne	2b
+--
+	%pc == 0
+
+-- test: bcc not equal 2
+2:	move.l	#0xb0000000, %d0
+	cmp.l	#0xb0000000, %d0
+	bne	2b
+--
+	%pc != 0
+
+-- test: bcc equal
+2:	move.l	#0xb0000000, %d0
+	cmp.l	#0xb0000000, %d0
+	beq	2b
+--
+	%pc == 0
+
+-- test: bcc overflow clear 1
+2:	move.l	#0xb0000000, %d0
+	add.l	#0x10000000, %d0
+	bvc	2b
+--
+	%pc == 0
+
+-- test: bcc overflow clear 2
+2:	move.l	#0xb0000000, %d0
+	add.l	#0xe0000000, %d0
+	bvc	2b
+--
+	%pc == 0
+
+-- test: bcc overflow set
+2:	move.l	#0xb0000000, %d0
+	add.l	#0xb0000000, %d0
+	bvs	2b
+--
+	%pc == 0
+
+-- test: bcc plus
+2:	move.l	#0xe0000000, %d0
+	add.l	#0x30000000, %d0
+	bpl	2b
+--
+	%pc == 0
+
+-- test: bcc minus
+2:	move.l	#0x70000000, %d0
+	add.l	#0x30000000, %d0
+	bmi	2b
+--
+	%pc == 0
+
 -- test: bchg dynamic data
 	moveq	#10, %d0
 	moveq	#2, %d1
@@ -344,6 +442,36 @@
 	btst	#2, (0xf000)
 --
 	!%Z
+
+-- test: cmp: flags signed k, unsigned k (X=0, C=0, V=0)
+	move.l	#5, %d0
+	cmp.l	#3, %d0
+--
+	!%X && !%C && !%V
+
+-- test: cmp: flags signed k, unsigned V (X=1, C=1, V=0)
+	move.l	#0, %d0
+	cmp.l	#2, %d0
+--
+	%X && %C && !%V
+
+-- test: cmp: flags signed V, unsigned k (X=0, C=0, V=1)
+	move.l	#0x80000002, %d0
+	cmp.l	#5, %d0
+--
+	!%X && !%C && %V
+
+-- test: cmp: flags result negative
+	move.l	#3, %d0
+	cmp.l	#5, %d0
+--
+	%N
+
+-- test: cmp: result zero
+	move.l	#5, %d0
+	cmp.l	#5, %d0
+--
+	%Z
 
 -- test: eor: 12 ^ 10
 	move.l	#12, (0xf000)

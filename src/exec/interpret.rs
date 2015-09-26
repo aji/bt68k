@@ -117,6 +117,34 @@ impl<M> Interpreter<M> {
         let sh = sz.size() << 3;
         self.set_flags(((inR >> sh) & 1) != 0, inR == 0, false, false);
     }
+
+    pub fn test_cc(&self, cc: Cond) -> bool {
+        use instruction::Cond::*;
+
+        let n = (self.cpu.status & 0b1000) != 0;
+        let z = (self.cpu.status & 0b0100) != 0;
+        let v = (self.cpu.status & 0b0010) != 0;
+        let c = (self.cpu.status & 0b0001) != 0;
+
+        match cc {
+            True            => true,
+            False           => false,
+            High            => !c && !z,
+            LowOrSame       => c | z,
+            HighOrSame      => !c,
+            Low             => c,
+            NotEqual        => !z,
+            Equal           => z,
+            OverflowClear   => !v,
+            OverflowSet     => v,
+            Plus            => !n,
+            Minus           => n,
+            GreaterOrEqual  => (n && v) || (!n && !v),
+            LessThan        => (n && !v) || (!n && v),
+            GreaterThan     => (n && v && !z) || (!n && !v && !z),
+            LessOrEqual     => z || (n && !v) || (!n && v),
+        }
+    }
 }
 
 impl<M: Memory> Interpreter<M> {
@@ -262,6 +290,17 @@ impl<M: Memory> Interpreter<M> {
                 true
             },
 
+            Bcc(cc, disp) => {
+                if self.test_cc(cc) {
+                    self.cpu.pc = self.cpu.pc
+                        .wrapping_add(2)
+                        .wrapping_add((disp as i32) as u32);
+                } else {
+                    self.cpu.pc = pcnext;
+                }
+                false
+            },
+
             BCHG_Data(dn, ea) => {
                 if let EA::DataDirect(dx) = ea {
                     let dest = self.cpu.data[dx as usize];
@@ -394,6 +433,29 @@ impl<M: Memory> Interpreter<M> {
             CLR(sz, ea) => {
                 ea.write(sz, self, 0);
                 self.set_flags(false, true, false, false);
+                true
+            },
+
+            CMP(sz, ea, dn) => {
+                let source = ea.value_of(sz, self);
+                let dest = self.cpu.data[dn as usize];
+                let result = sz.masked(dest.wrapping_sub(source));
+                self.flags_sub(sz, source, dest, result);
+                true
+            },
+
+            CMPA(sz, ea, an) => {
+                let source = ea.value_of(sz, self);
+                let dest = self.cpu.addr[an as usize];
+                let result = dest.wrapping_sub(source);
+                self.flags_sub(sz, source, dest, result);
+                true
+            },
+
+            CMPI(sz, source, ea) => {
+                let dest = ea.value_of(sz, self);
+                let result = sz.masked(dest.wrapping_sub(source));
+                self.flags_sub(sz, source, dest, result);
                 true
             },
 
