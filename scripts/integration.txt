@@ -33,7 +33,8 @@
 -- test: effective address postincrement byte
 	lea	(0xf010), %a0
 	moveq	#122, %d0
-	move.b	%d0, (%a0)+
+	move.b	#0, (0xf010)
+	add.b	%d0, (%a0)+
 --
 	%a0 == 0xf011 &&
 	mem8<0xf010> == 122
@@ -41,7 +42,8 @@
 -- test: effective address postincrement word
 	lea	(0xf010), %a0
 	moveq	#122, %d0
-	move.w	%d0, (%a0)+
+	move.w	#0, (0xf010)
+	add.w	%d0, (%a0)+
 --
 	%a0 == 0xf012 &&
 	mem16<0xf010> == 122
@@ -49,7 +51,8 @@
 -- test: effective address postincrement long
 	lea	(0xf010), %a0
 	moveq	#122, %d0
-	move.l	%d0, (%a0)+
+	move.l	#0, (0xf010)
+	add.l	%d0, (%a0)+
 --
 	%a0 == 0xf014 &&
 	mem32<0xf010> == 122
@@ -57,7 +60,8 @@
 -- test: effective address predecrement byte
 	lea	(0xf010), %a0
 	moveq	#122, %d0
-	move.b	%d0, -(%a0)
+	move.b	#0, (0xf00f)
+	add.b	%d0, -(%a0)
 --
 	%a0 == 0xf00f &&
 	mem8<0xf00f> == 122
@@ -65,7 +69,8 @@
 -- test: effective address predecrement word
 	lea	(0xf010), %a0
 	moveq	#122, %d0
-	move.w	%d0, -(%a0)
+	move.w	#0, (0xf00e)
+	add.w	%d0, -(%a0)
 --
 	%a0 == 0xf00e &&
 	mem16<0xf00e> == 122
@@ -73,7 +78,8 @@
 -- test: effective address predecrement long
 	lea	(0xf010), %a0
 	moveq	#122, %d0
-	move.l	%d0, -(%a0)
+	move.l	#0, (0xf00c)
+	add.l	%d0, -(%a0)
 --
 	%a0 == 0xf00c &&
 	mem32<0xf00c> == 122

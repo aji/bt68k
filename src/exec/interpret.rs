@@ -220,73 +220,89 @@ impl<M: Memory> Interpreter<M> {
 
         let res = match inst {
             ADD_to_Data(sz, ea, dn) => {
+                ea.prepare(sz, self);
                 let source = ea.value_of(sz, self);
                 let dest = self.cpu.data[dn as usize];
                 let result = sz.masked(source.wrapping_add(dest));
                 let prev = self.cpu.data[dn as usize] & !sz.mask();
                 self.cpu.data[dn as usize] = prev | result;
                 self.flags_add(sz, source, dest, result);
+                ea.finish(sz, self);
                 true
             },
 
             ADD_to_EA(sz, dn, ea) => {
+                ea.prepare(sz, self);
                 let source = self.cpu.data[dn as usize];
                 let dest = ea.value_of(sz, self);
                 let result = sz.masked(source.wrapping_add(dest));
                 ea.write(sz, self, result);
                 self.flags_add(sz, source, dest, result);
+                ea.finish(sz, self);
                 true
             },
 
             ADDA(sz, ea, an) => {
+                ea.prepare(sz, self);
                 let source = ea.value_of(sz, self);
                 let dest = self.cpu.addr[an as usize];
                 let result = source.wrapping_add(dest);
                 self.cpu.addr[an as usize] = result;
+                ea.finish(sz, self);
                 true
             },
 
             ADDI(sz, source, ea) => {
+                ea.prepare(sz, self);
                 let dest = ea.value_of(sz, self);
                 let result = sz.masked(source.wrapping_add(dest));
                 ea.write(sz, self, result);
                 self.flags_add(sz, source, dest, result);
+                ea.finish(sz, self);
                 true
             },
 
             ADDQ(sz, source8, ea) => {
+                ea.prepare(sz, self);
                 let source = source8 as u32;
                 let dest = ea.value_of(sz, self);
                 let result = sz.masked(source.wrapping_add(dest));
                 ea.write(sz, self, result);
                 self.flags_add(sz, source, dest, result);
+                ea.finish(sz, self);
                 true
             },
 
             AND_to_Data(sz, ea, dn) => {
+                ea.prepare(sz, self);
                 let source = ea.value_of(sz, self);
                 let dest = self.cpu.data[dn as usize];
                 let result = source & dest;
                 let prev = self.cpu.data[dn as usize] & !sz.mask();
                 self.cpu.data[dn as usize] = prev | result;
                 self.flags_logic(sz, result);
+                ea.finish(sz, self);
                 true
             },
 
             AND_to_EA(sz, dn, ea) => {
+                ea.prepare(sz, self);
                 let source = self.cpu.data[dn as usize];
                 let dest = ea.value_of(sz, self);
                 let result = source & dest;
                 ea.write(sz, self, result);
                 self.flags_logic(sz, result);
+                ea.finish(sz, self);
                 true
             },
 
             ANDI(sz, source, ea) => {
+                ea.prepare(sz, self);
                 let dest = ea.value_of(sz, self);
                 let result = sz.masked(source & dest);
                 ea.write(sz, self, result);
                 self.flags_logic(sz, result);
+                ea.finish(sz, self);
                 true
             },
 
@@ -308,10 +324,12 @@ impl<M: Memory> Interpreter<M> {
                     self.cpu.data[dx as usize] = dest ^ bit;
                     self.set_flag_z((dest & bit) == 0);
                 } else {
+                    ea.prepare(Size::Byte, self);
                     let dest = ea.value_of(Size::Byte, self);
                     let bit = 1 << (self.cpu.data[dn as usize] & 0x7);
                     ea.write(Size::Byte, self, dest ^ bit);
                     self.set_flag_z((dest & bit) == 0);
+                    ea.finish(Size::Byte, self);
                 }
                 true
             },
@@ -323,10 +341,12 @@ impl<M: Memory> Interpreter<M> {
                     self.cpu.data[dx as usize] = dest ^ bit;
                     self.set_flag_z((dest & bit) == 0);
                 } else {
+                    ea.prepare(Size::Byte, self);
                     let dest = ea.value_of(Size::Byte, self);
                     let bit = 1 << ((bitnr as u32) & 0x7);
                     ea.write(Size::Byte, self, dest ^ bit);
                     self.set_flag_z((dest & bit) == 0);
+                    ea.finish(Size::Byte, self);
                 }
                 true
             },
@@ -338,10 +358,12 @@ impl<M: Memory> Interpreter<M> {
                     self.cpu.data[dx as usize] = dest & !bit;
                     self.set_flag_z((dest & bit) == 0);
                 } else {
+                    ea.prepare(Size::Byte, self);
                     let dest = ea.value_of(Size::Byte, self);
                     let bit = 1 << (self.cpu.data[dn as usize] & 0x7);
                     ea.write(Size::Byte, self, dest & !bit);
                     self.set_flag_z((dest & bit) == 0);
+                    ea.finish(Size::Byte, self);
                 }
                 true
             },
@@ -353,10 +375,12 @@ impl<M: Memory> Interpreter<M> {
                     self.cpu.data[dx as usize] = dest & !bit;
                     self.set_flag_z((dest & bit) == 0);
                 } else {
+                    ea.prepare(Size::Byte, self);
                     let dest = ea.value_of(Size::Byte, self);
                     let bit = 1 << ((bitnr as u32) & 0x7);
                     ea.write(Size::Byte, self, dest & !bit);
                     self.set_flag_z((dest & bit) == 0);
+                    ea.finish(Size::Byte, self);
                 }
                 true
             },
@@ -374,10 +398,12 @@ impl<M: Memory> Interpreter<M> {
                     self.cpu.data[dx as usize] = dest | bit;
                     self.set_flag_z((dest & bit) == 0);
                 } else {
+                    ea.prepare(Size::Byte, self);
                     let dest = ea.value_of(Size::Byte, self);
                     let bit = 1 << (self.cpu.data[dn as usize] & 0x7);
                     ea.write(Size::Byte, self, dest | bit);
                     self.set_flag_z((dest & bit) == 0);
+                    ea.finish(Size::Byte, self);
                 }
                 true
             },
@@ -389,10 +415,12 @@ impl<M: Memory> Interpreter<M> {
                     self.cpu.data[dx as usize] = dest | bit;
                     self.set_flag_z((dest & bit) == 0);
                 } else {
+                    ea.prepare(Size::Byte, self);
                     let dest = ea.value_of(Size::Byte, self);
                     let bit = 1 << ((bitnr as u32) & 0x7);
                     ea.write(Size::Byte, self, dest | bit);
                     self.set_flag_z((dest & bit) == 0);
+                    ea.finish(Size::Byte, self);
                 }
                 true
             },
@@ -403,9 +431,11 @@ impl<M: Memory> Interpreter<M> {
                     let bit = 1 << (self.cpu.data[dn as usize] & 0x1f);
                     self.set_flag_z((dest & bit) == 0);
                 } else {
+                    ea.prepare(Size::Byte, self);
                     let dest = ea.value_of(Size::Byte, self);
                     let bit = 1 << (self.cpu.data[dn as usize] & 0x7);
                     self.set_flag_z((dest & bit) == 0);
+                    ea.finish(Size::Byte, self);
                 }
                 true
             },
@@ -416,9 +446,11 @@ impl<M: Memory> Interpreter<M> {
                     let bit = 1 << ((bitnr as u32) & 0x1f);
                     self.set_flag_z((dest & bit) == 0);
                 } else {
+                    ea.prepare(Size::Byte, self);
                     let dest = ea.value_of(Size::Byte, self);
                     let bit = 1 << ((bitnr as u32) & 0x7);
                     self.set_flag_z((dest & bit) == 0);
+                    ea.finish(Size::Byte, self);
                 }
                 true
             },
@@ -433,24 +465,30 @@ impl<M: Memory> Interpreter<M> {
             },
 
             CLR(sz, ea) => {
+                ea.prepare(sz, self);
                 ea.write(sz, self, 0);
                 self.set_flags(false, true, false, false);
+                ea.finish(sz, self);
                 true
             },
 
             CMP(sz, ea, dn) => {
+                ea.prepare(sz, self);
                 let source = ea.value_of(sz, self);
                 let dest = self.cpu.data[dn as usize];
                 let result = sz.masked(dest.wrapping_sub(source));
                 self.flags_sub(sz, source, dest, result);
+                ea.finish(sz, self);
                 true
             },
 
             CMPA(sz, ea, an) => {
+                ea.prepare(sz, self);
                 let source = ea.value_of(sz, self);
                 let dest = self.cpu.addr[an as usize];
                 let result = dest.wrapping_sub(source);
                 self.flags_sub(sz, source, dest, result);
+                ea.finish(sz, self);
                 true
             },
 
@@ -480,19 +518,23 @@ impl<M: Memory> Interpreter<M> {
             },
 
             EOR(sz, dn, ea) => {
+                ea.prepare(sz, self);
                 let source = self.cpu.data[dn as usize];
                 let dest = ea.value_of(sz, self);
                 let result = source ^ dest;
                 ea.write(sz, self, result);
                 self.flags_logic(sz, result);
+                ea.finish(sz, self);
                 true
             },
 
             EORI(sz, source, ea) => {
+                ea.prepare(sz, self);
                 let dest = ea.value_of(sz, self);
                 let result = sz.masked(source ^ dest);
                 ea.write(sz, self, result);
                 self.flags_logic(sz, result);
+                ea.finish(sz, self);
                 true
             },
 
@@ -544,19 +586,25 @@ impl<M: Memory> Interpreter<M> {
             },
 
             JMP(ea) => {
-                self.cpu.pc = ea.addr_of(Size::Word, self);
+                ea.prepare(Size::Word, self);
+                self.cpu.pc = ea.addr_of(self);
+                ea.finish(Size::Word, self);
                 false
             },
 
             JSR(ea) => {
-                self.cpu.pc = ea.addr_of(Size::Word, self);
+                ea.prepare(Size::Word, self);
+                self.cpu.pc = ea.addr_of(self);
                 self.push32(pcnext);
+                ea.finish(Size::Word, self);
                 false
             },
 
             LEA(ea, an) => {
-                let data = ea.addr_of(Size::Word, self);
+                ea.prepare(Size::Word, self);
+                let data = ea.addr_of(self);
                 EA::AddrDirect(an).write(Size::Word, self, data);
+                ea.finish(Size::Word, self);
                 true
             },
 
@@ -572,22 +620,30 @@ impl<M: Memory> Interpreter<M> {
             },
 
             MOVE(sz, src, dst) => {
+                src.prepare(sz, self);
+                dst.prepare(sz, self);
                 let result = sz.masked(src.value_of(sz, self));
                 dst.write(sz, self, result);
                 self.flags_logic(sz, result);
+                src.finish(sz, self);
+                dst.finish(sz, self);
                 true
             },
 
             MOVE_to_CCR(ea) => {
+                ea.prepare(Size::Byte, self);
                 let data = ea.value_of(Size::Byte, self) as u16;
                 self.cpu.status &= 0xff00;
                 self.cpu.status |= data & 0x1f;
+                ea.finish(Size::Byte, self);
                 true
             },
 
             MOVE_to_SR(ea) => {
                 if self.cpu.supervisor() {
+                    ea.prepare(Size::Word, self);
                     self.cpu.status = ea.value_of(Size::Word, self) as u16;
+                    ea.finish(Size::Word, self);
                     true
                 } else {
                     self.trap(exec::EXC_PRIV);
@@ -596,8 +652,10 @@ impl<M: Memory> Interpreter<M> {
             },
 
             MOVEA(sz, ea, an) => {
+                ea.prepare(sz, self);
                 let result = sz.masked(ea.value_of(sz, self));
                 EA::AddrDirect(an).write(Size::Word, self, result);
+                ea.finish(sz, self);
                 true
             }
 
@@ -609,51 +667,63 @@ impl<M: Memory> Interpreter<M> {
             },
 
             NEG(sz, ea) => {
+                ea.prepare(sz, self);
                 let result = (0u32).wrapping_sub(ea.value_of(sz, self));
                 ea.write(sz, self, result);
+                ea.finish(sz, self);
                 true
             },
 
             NEGX(sz, ea) => {
+                ea.prepare(sz, self);
                 let result = (0u32)
                     .wrapping_sub(ea.value_of(sz, self))
                     .wrapping_sub(if self.cpu.cc_x() { 1 } else { 0 });
                 ea.write(sz, self, result);
+                ea.finish(sz, self);
                 true
             },
 
             NOP => true,
 
             OR_to_Data(sz, ea, dn) => {
+                ea.prepare(sz, self);
                 let source = ea.value_of(sz, self);
                 let dest = self.cpu.data[dn as usize];
                 let result = source | dest;
                 let prev = self.cpu.data[dn as usize] & !sz.mask();
                 self.cpu.data[dn as usize] = prev | result;
                 self.flags_logic(sz, result);
+                ea.finish(sz, self);
                 true
             },
 
             OR_to_EA(sz, dn, ea) => {
+                ea.prepare(sz, self);
                 let source = self.cpu.data[dn as usize];
                 let dest = ea.value_of(sz, self);
                 let result = source | dest;
                 ea.write(sz, self, result);
                 self.flags_logic(sz, result);
+                ea.finish(sz, self);
                 true
             },
 
             ORI(sz, source, ea) => {
+                ea.prepare(sz, self);
                 let dest = ea.value_of(sz, self);
                 let result = sz.masked(source | dest);
                 ea.write(sz, self, result);
                 self.flags_logic(sz, result);
+                ea.finish(sz, self);
                 true
             },
 
             PEA(ea) => {
-                let data = ea.addr_of(Size::Long, self);
+                ea.prepare(Size::Long, self);
+                let data = ea.addr_of(self);
                 self.push32(data);
+                ea.finish(Size::Long, self);
                 true
             },
 
@@ -682,55 +752,67 @@ impl<M: Memory> Interpreter<M> {
             },
 
             Scc(cc, ea) => {
+                ea.prepare(Size::Byte, self);
                 if self.test_cc(cc) {
                     ea.write(Size::Byte, self, 0xff);
                 } else {
                     ea.write(Size::Byte, self, 0x00);
                 }
+                ea.finish(Size::Byte, self);
                 true
             },
 
             SUB_to_Data(sz, ea, dn) => {
+                ea.prepare(sz, self);
                 let source = ea.value_of(sz, self);
                 let dest = self.cpu.data[dn as usize];
                 let result = sz.masked(dest.wrapping_sub(source));
                 let prev = self.cpu.data[dn as usize] & !sz.mask();
                 self.cpu.data[dn as usize] = prev | result;
                 self.flags_sub(sz, source, dest, result);
+                ea.finish(sz, self);
                 true
             },
 
             SUB_to_EA(sz, dn, ea) => {
+                ea.prepare(sz, self);
                 let source = self.cpu.data[dn as usize];
                 let dest = ea.value_of(sz, self);
                 let result = sz.masked(dest.wrapping_sub(source));
                 ea.write(sz, self, result);
                 self.flags_sub(sz, source, dest, result);
+                ea.finish(sz, self);
                 true
             },
 
             SUBA(sz, ea, an) => {
+                ea.prepare(sz, self);
                 let source = ea.value_of(sz, self);
                 let dest = self.cpu.addr[an as usize];
                 let result = dest.wrapping_sub(source);
                 self.cpu.addr[an as usize] = result;
+                ea.finish(sz, self);
                 true
             },
 
             SUBI(sz, source, ea) => {
+                ea.prepare(sz, self);
                 let dest = ea.value_of(sz, self);
                 let result = sz.masked(dest.wrapping_sub(source));
                 ea.write(sz, self, result);
                 self.flags_sub(sz, source, dest, result);
+                ea.finish(sz, self);
                 true
             },
 
             SUBQ(sz, source8, ea) => {
+                ea.prepare(sz, self);
                 let source = source8 as u32;
                 let dest = ea.value_of(sz, self);
                 let result = sz.masked(dest.wrapping_sub(source));
                 ea.write(sz, self, result);
                 self.flags_sub(sz, source, dest, result);
+                ea.finish(sz, self);
                 true
             },
 
@@ -745,10 +827,12 @@ impl<M: Memory> Interpreter<M> {
             },
 
             TAS(ea) => {
+                ea.prepare(Size::Byte, self);
                 let mut result = ea.value_of(Size::Byte, self);
                 self.flags_logic(Size::Byte, result);
                 result |= 0x80;
                 ea.write(Size::Byte, self, result);
+                ea.finish(Size::Byte, self);
                 true
             },
 
@@ -765,8 +849,10 @@ impl<M: Memory> Interpreter<M> {
             },
 
             TST(sz, ea) => {
+                ea.prepare(sz, self);
                 let result = ea.value_of(sz, self);
                 self.flags_logic(sz, result);
+                ea.finish(sz, self);
                 true
             },
 
@@ -791,12 +877,44 @@ impl<M: Memory> Interpreter<M> {
 }
 
 trait Evaluable<M> {
+    fn prepare(self, sz: Size, ee: &mut Interpreter<M>);
+    fn finish(self, sz: Size, ee: &mut Interpreter<M>);
     fn value_of(self, sz: Size, ee: &mut Interpreter<M>) -> u32;
     fn write(self, sz: Size, ee: &mut Interpreter<M>, data: u32);
-    fn addr_of(self, sz: Size, ee: &mut Interpreter<M>) -> u32;
+    fn addr_of(self, ee: &mut Interpreter<M>) -> u32;
 }
 
 impl<M: Memory> Evaluable<M> for EA {
+    fn prepare(self, sz: Size, ee: &mut Interpreter<M>) {
+        if let EA::AddrPreDec(an) = self {
+            if an == 7 {
+                let sp = ee.cpu.sp();
+                *sp = sp.wrapping_sub(match sz {
+                    Size::Byte | Size::Word => 2,
+                    Size::Long => 4
+                });
+            } else {
+                ee.cpu.addr[an as usize] = ee.cpu.addr[an as usize]
+                    .wrapping_sub(sz.size() as u32);
+            }
+        }
+    }
+
+    fn finish(self, sz: Size, ee: &mut Interpreter<M>) {
+        if let EA::AddrPostInc(an) = self {
+            if an == 7 {
+                let sp = ee.cpu.sp();
+                *sp = sp.wrapping_add(match sz {
+                    Size::Byte | Size::Word => 2,
+                    Size::Long => 4
+                });
+            } else {
+                ee.cpu.addr[an as usize] = ee.cpu.addr[an as usize]
+                    .wrapping_add(sz.size() as u32);
+            }
+        }
+    }
+
     fn value_of(self, sz: Size, ee: &mut Interpreter<M>) -> u32 {
         use instruction::EA::*;
 
@@ -813,7 +931,7 @@ impl<M: Memory> Evaluable<M> for EA {
             ImmWord(x) => return x as u32,
             ImmLong(x) => return x,
 
-            ea => ea.addr_of(sz, ee)
+            ea => ea.addr_of(ee)
         };
 
         ee.mem.readsz(addr, sz)
@@ -840,50 +958,24 @@ impl<M: Memory> Evaluable<M> for EA {
             ImmWord(_) => { return; },
             ImmLong(_) => { return; },
 
-            ea => ea.addr_of(sz, ee)
+            ea => ea.addr_of(ee)
         };
 
         ee.mem.writesz(addr, sz, data);
     }
 
-    fn addr_of(self, sz: Size, ee: &mut Interpreter<M>) -> u32 {
+    fn addr_of(self, ee: &mut Interpreter<M>) -> u32 {
         use instruction::EA::*;
 
         match self {
-            AddrIndirect(an) => {
+            AddrIndirect(an) |
+            AddrPreDec(an) |
+            AddrPostInc(an) => {
                 if an == 7 && ee.cpu.supervisor() {
                     ee.cpu.ssp
                 } else {
                     ee.cpu.addr[an as usize]
                 }
-            },
-            AddrPostInc(an) => {
-                if an == 7 {
-                    let sp = ee.cpu.sp();
-                    let a = *sp;
-                    *sp = sp.wrapping_add(match sz {
-                        Size::Byte | Size::Word => 2,
-                        Size::Long => 4
-                    });
-                    return a;
-                }
-                let a = ee.cpu.addr[an as usize];
-                ee.cpu.addr[an as usize] =
-                    ee.cpu.addr[an as usize].wrapping_add(sz.size() as u32);
-                a
-            },
-            AddrPreDec(an) => {
-                if an == 7 {
-                    let sp = ee.cpu.sp();
-                    *sp = sp.wrapping_sub(match sz {
-                        Size::Byte | Size::Word => 2,
-                        Size::Long => 4
-                    });
-                    return *sp;
-                }
-                ee.cpu.addr[an as usize] =
-                    ee.cpu.addr[an as usize].wrapping_sub(sz.size() as u32);
-                ee.cpu.addr[an as usize]
             },
             AddrDisplace(an, disp) => {
                 ee.cpu.addr[an as usize].wrapping_add(
