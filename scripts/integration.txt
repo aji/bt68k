@@ -479,6 +479,15 @@
 --
 	%Z
 
+-- test: cmpm
+	movea	#0xf000, %a3
+	movea	#0xf008, %a4
+	move.l	#3, (%a3)
+	move.l	#5, (%a4)
+	cmpm.l	(%a4)+, (%a3)+
+--
+	%N && !%Z && %a3 == 0xf004 && %a4 == 0xf00c
+
 -- test: eor: 12 ^ 10
 	move.l	#12, (0xf000)
 	moveq	#10, %d0

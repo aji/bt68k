@@ -499,6 +499,20 @@ impl<M: Memory> Interpreter<M> {
                 true
             },
 
+            CMPM(sz, ay, ax) => {
+                let src = EA::AddrPostInc(ay);
+                let dst = EA::AddrPostInc(ax);
+                src.prepare(sz, self);
+                dst.prepare(sz, self);
+                let source = src.value_of(sz, self);
+                let dest = dst.value_of(sz, self);
+                let result = sz.masked(dest.wrapping_sub(source));
+                self.flags_sub(sz, source, dest, result);
+                src.finish(sz, self);
+                dst.finish(sz, self);
+                true
+            },
+
             DBcc(cc, dn, disp) => {
                 if self.test_cc(cc) {
                     let res = (self.cpu.data[dn as usize] as u16)
