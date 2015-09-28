@@ -480,6 +480,27 @@
 --
 	mem32<0xf000> == 6
 
+-- test: exg data
+	moveq	#10, %d0
+	moveq	#15, %d1
+	exg	%d0, %d1
+--
+	%d0 == 15 && %d1 == 10
+
+-- test: exg address
+	move.l	#10, %a0
+	move.l	#15, %a1
+	exg	%a0, %a1
+--
+	%a0 == 15 && %a1 == 10
+
+-- test: exg data and address
+	moveq	#10, %d0
+	move.l	#15, %a1
+	exg	%d0, %a1
+--
+	%d0 == 15 && %a1 == 10
+
 -- test: eor immediate
 	moveq	#10, %d0
 	eori.l	#12, %d0
@@ -580,6 +601,13 @@
 --
 	%a0 == 0
 
+-- test: link
+	move.l	#0x10000, %a7
+	move.l	#30, %a6
+	link	%a6, #-8
+--
+	mem32<0xfffc> == 30 && %a6 == 0xfffc && %ssp == 0xfff4
+
 -- test: just moveq
 	moveq	#2, %d0
 	moveq	#60, %d1
@@ -641,6 +669,12 @@
 	move	#0x7777, %sr
 --
 	%sr == 0x7777
+
+-- test: neg
+	move.l	#30, %d0
+	neg.l	%d0
+--
+	%d0 == (-30i32) as u32
 
 -- test: nop
 	nop

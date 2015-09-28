@@ -114,7 +114,7 @@ impl<M> Interpreter<M> {
 
     #[allow(non_snake_case)]
     pub fn flags_logic(&mut self, sz: Size, inR: u32) {
-        let sh = sz.size() << 3;
+        let sh = (sz.size() << 3) - 1;
         self.set_flags(((inR >> sh) & 1) != 0, inR == 0, false, false);
     }
 
@@ -363,7 +363,7 @@ impl<M: Memory> Interpreter<M> {
 
             BRA(disp) => {
                 let offs = 2u32.wrapping_add((disp as i32) as u32);
-                self.cpu.pc = self.cpu.pc.wrapping_add(offs);
+                self.cpu.pc = self.cpu.pc.wrapping_add(2).wrapping_add(offs);
                 false
             },
 
@@ -426,7 +426,9 @@ impl<M: Memory> Interpreter<M> {
             BSR(disp) => {
                 let offs = 2u32.wrapping_add((disp as i32) as u32);
                 self.push32(pcnext);
-                self.cpu.pc = self.cpu.pc.wrapping_add(offs);
+                self.cpu.pc = self.cpu.pc
+                    .wrapping_add(2)
+                    .wrapping_add(offs);
                 false
             },
 
@@ -459,6 +461,24 @@ impl<M: Memory> Interpreter<M> {
                 true
             },
 
+            DBcc(cc, dn, disp) => {
+                if self.test_cc(cc) {
+                    let res = (self.cpu.data[dn as usize] as u16)
+                        .wrapping_sub(1);
+                    EA::DataDirect(dn).write(Size::Word, self, res as u32);
+                    if res != 0xffff { // 0xffff is -1
+                        self.cpu.pc = self.cpu.pc
+                            .wrapping_add(2)
+                            .wrapping_add((disp as i32) as u32);
+                    } else {
+                        self.cpu.pc = pcnext;
+                    }
+                } else {
+                    self.cpu.pc = pcnext;
+                }
+                false
+            },
+
             EOR(sz, dn, ea) => {
                 let source = self.cpu.data[dn as usize];
                 let dest = ea.value_of(sz, self);
@@ -476,6 +496,53 @@ impl<M: Memory> Interpreter<M> {
                 true
             },
 
+            EXG_Data(dx, dy) => {
+                let dx = dx as usize;
+                let dy = dy as usize;
+                let t = self.cpu.data[dx];
+                self.cpu.data[dx] = self.cpu.data[dy];
+                self.cpu.data[dy] = t;
+                true
+            },
+
+            EXG_Addr(ax, ay) => {
+                let ax = ax as usize;
+                let ay = ay as usize;
+                let t = self.cpu.addr[ax];
+                self.cpu.addr[ax] = self.cpu.addr[ay];
+                self.cpu.addr[ay] = t;
+                true
+            },
+
+            EXG_Both(dx, ay) => {
+                let dx = dx as usize;
+                let ay = ay as usize;
+                let t = self.cpu.data[dx];
+                self.cpu.data[dx] = self.cpu.addr[ay];
+                self.cpu.addr[ay] = t;
+                true
+            },
+
+            EXT(sz, dn) => {
+                let x = self.cpu.data[dn as usize];
+                let result = match sz {
+                    Size::Word => ((x as  i8) as i16) as u32,
+                    Size::Long => ((x as i16) as i32) as u32,
+
+                    Size::Byte => {
+                        self.trap(exec::EXC_ILLEGAL);
+                        return false;
+                    },
+                };
+                EA::DataDirect(dn).write(sz, self, result);
+                true
+            },
+
+            ILLEGAL => {
+                self.trap(exec::EXC_ILLEGAL);
+                false
+            },
+
             JMP(ea) => {
                 self.cpu.pc = ea.addr_of(Size::Word, self);
                 false
@@ -490,6 +557,17 @@ impl<M: Memory> Interpreter<M> {
             LEA(ea, an) => {
                 let data = ea.addr_of(Size::Word, self);
                 EA::AddrDirect(an).write(Size::Word, self, data);
+                true
+            },
+
+            LINK(an, disp) => {
+                let sp = EA::AddrDirect(7);
+                let addr = self.cpu.addr[an as usize];
+                self.push32(addr);
+                self.cpu.addr[an as usize] = sp.value_of(Size::Long, self);
+                let newsp = self.cpu.addr[an as usize]
+                    .wrapping_add((disp as i32) as u32);
+                sp.write(Size::Long, self, newsp);
                 true
             },
 
@@ -530,6 +608,20 @@ impl<M: Memory> Interpreter<M> {
                 true
             },
 
+            NEG(sz, ea) => {
+                let result = (0u32).wrapping_sub(ea.value_of(sz, self));
+                ea.write(sz, self, result);
+                true
+            },
+
+            NEGX(sz, ea) => {
+                let result = (0u32)
+                    .wrapping_sub(ea.value_of(sz, self))
+                    .wrapping_sub(if self.cpu.cc_x() { 1 } else { 0 });
+                ea.write(sz, self, result);
+                true
+            },
+
             NOP => true,
 
             OR_to_Data(sz, ea, dn) => {
@@ -565,9 +657,37 @@ impl<M: Memory> Interpreter<M> {
                 true
             },
 
+            RESET => {
+                if self.cpu.supervisor() {
+                    self.reset();
+                } else {
+                    self.trap(exec::EXC_PRIV);
+                }
+                false
+            },
+
+            RTE => {
+                if self.cpu.supervisor() {
+                    self.cpu.status = self.pop16();
+                    self.cpu.pc = self.pop32();
+                } else {
+                    self.trap(exec::EXC_PRIV);
+                }
+                false
+            },
+
             RTS => {
                 self.cpu.pc = self.pop32();
                 false
+            },
+
+            Scc(cc, ea) => {
+                if self.test_cc(cc) {
+                    ea.write(Size::Byte, self, 0xff);
+                } else {
+                    ea.write(Size::Byte, self, 0x00);
+                }
+                true
             },
 
             SUB_to_Data(sz, ea, dn) => {
@@ -611,6 +731,49 @@ impl<M: Memory> Interpreter<M> {
                 let result = sz.masked(dest.wrapping_sub(source));
                 ea.write(sz, self, result);
                 self.flags_sub(sz, source, dest, result);
+                true
+            },
+
+            SWAP(dn) => {
+                let dn = dn as usize;
+                let hi = (self.cpu.data[dn] >> 16) & 0x0000ffff;
+                let lo = (self.cpu.data[dn] << 16) & 0xffff0000;
+                let result = hi | lo;
+                self.cpu.data[dn] = result;
+                self.flags_logic(Size::Long, result);
+                true
+            },
+
+            TAS(ea) => {
+                let mut result = ea.value_of(Size::Byte, self);
+                self.flags_logic(Size::Byte, result);
+                result |= 0x80;
+                ea.write(Size::Byte, self, result);
+                true
+            },
+
+            TRAP(vec) => {
+                self.trap(exec::EXC_TRAP_BASE + (vec as u32));
+                false
+            },
+
+            TRAPV => {
+                if self.cpu.cc_v() {
+                    self.trap(exec::EXC_TRAPV);
+                }
+                false
+            },
+
+            TST(sz, ea) => {
+                let result = ea.value_of(sz, self);
+                self.flags_logic(sz, result);
+                true
+            },
+
+            UNLK(an) => {
+                let tmp = self.cpu.addr[an as usize];
+                EA::AddrDirect(7).write(Size::Long, self, tmp);
+                self.cpu.addr[an as usize] = self.pop32();
                 true
             },
 
